@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   hotnews-crawler:
     build:
@@ -9,6 +7,8 @@ services:
     restart: unless-stopped
     ports:
       - "5000:5000"
+      # IPv6支持（如果系统支持IPv6）
+      - ":::5000:5000"
     volumes:
       # 挂载数据目录（持久化数据库和日志）
       - ./data:/app/data
@@ -28,6 +28,8 @@ services:
     restart: unless-stopped
     ports:
       - "3001:3001"
+      # IPv6支持（如果系统支持IPv6）
+      - ":::3001:3001"
     volumes:
       # 挂载环境变量文件（包含API密钥）
       - ./.env:/app/.env
@@ -51,3 +53,10 @@ services:
 networks:
   hotnews-network:
     driver: bridge
+    # 启用IPv6支持
+    enable_ipv6: true
+    ipam:
+      driver: default
+      config:
+        - subnet: "172.20.0.0/16"
+        - subnet: "fd00:dead:beef::/64"
