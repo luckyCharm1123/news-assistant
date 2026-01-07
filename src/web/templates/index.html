@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}首页 - 热点新闻爬虫{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2 class="mb-3">📊 数据概览</h2>
+        {% if summary %}
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card stats-card">
+                    <div class="stats-number">{{ summary.total_news }}</div>
+                    <div class="stats-label">今日新闻总数</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card">
+                    <div class="stats-number">{{ summary.total_sources }}</div>
+                    <div class="stats-label">新闻来源数</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card">
+                    <div class="stats-number">{{ "%.1f"|format(summary.avg_daily) }}</div>
+                    <div class="stats-label">日均新闻数</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card">
+                    <div class="stats-number">{{ summary.hot_words|length }}</div>
+                    <div class="stats-label">热词数量</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <h2 class="mb-3">🔥 最新热点（24小时）</h2>
+        {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+        {% elif grouped_news %}
+            {% for source, news_list in grouped_news.items() %}
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">📰 {{ source }} ({{ news_list|length }}条)</h5>
+                </div>
+                <div class="card-body">
+                    {% for news in news_list[:20] %}
+                    <div class="news-item">
+                        <span class="news-rank {% if news.rank <= 3 %}top-3{% endif %}">{{ news.rank }}</span>
+                        <a href="{{ news.url }}" target="_blank" class="text-decoration-none">{{ news.title }}</a>
+                        <small class="text-muted ms-2">{{ news.crawled_at[5:16] }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="alert alert-info">暂无新闻数据</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

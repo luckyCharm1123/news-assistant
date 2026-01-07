@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  hotnews-crawler:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: hotnews_crawler
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      # 挂载数据目录（持久化数据库和日志）
+      - ./data:/app/data
+      - ./logs:/app/logs
+      # 挂载环境变量文件（包含API密钥）
+      - ./.env:/app/.env
+    environment:
+      - TZ=Asia/Shanghai
+    networks:
+      - hotnews-network
+
+networks:
+  hotnews-network:
+    driver: bridge

@@ -1,0 +1,36 @@
+# 热点新闻爬虫配置文件
+
+# 数据库配置
+database:
+  path: "data/hotnews.db"
+  retention_days: 1  # 数据保留天数（保留今天，清理昨天的数据）
+
+# 爬虫配置
+crawler:
+  api_url: "https://newsnow.busiyi.world/api/s"
+  request_interval: 1  # 请求间隔（秒）
+  max_retries: 2  # 最大重试次数
+  retry_wait_min: 3  # 最小重试等待时间（秒）
+  retry_wait_max: 5  # 最大重试等待时间（秒）
+  timeout: 10  # 请求超时时间（秒）
+
+# 调度配置
+scheduler:
+  crawl_interval: 1800  # 爬取间隔（秒），30分钟
+  cleanup_time: "01:00"  # 每天清理时间
+
+# Web配置
+web:
+  host: "0.0.0.0"
+  port: 5000
+  debug: false
+
+# 日志配置
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "logs/crawler.log"
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+
+# 时区配置
+timezone: "Asia/Shanghai"

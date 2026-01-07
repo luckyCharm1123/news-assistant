@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "hotnews-crawler": {
+      "command": "node",
+      "args": [
+        "-e",
+        "const http = require('http');\nconst server = http.createServer((req, res) => {\n  if (req.url === '/mcp' && req.method === 'GET') {\n    res.writeHead(200, { 'Content-Type': 'application/json' });\n    res.end(JSON.stringify({\n      \"name\": \"hotnews-crawler\",\n      \"version\": \"1.0.0\",\n      \"description\": \"热点新闻爬虫MCP服务器\",\n      \"baseUrl\": \"http://localhost:5000\"\n    }));\n  } else {\n    res.writeHead(404);\n    res.end('Not Found');\n  }\n});\nserver.listen(3001, () => console.log('MCP Server running on port 3001'));"
+      ],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}

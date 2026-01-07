@@ -1,0 +1,76 @@
+# 平台配置文件
+# id: 平台唯一标识（勿修改）
+# name: 显示名称（可自定义）
+# enabled: 是否启用该平台
+
+platforms:
+  - id: "wallstreetcn-news"
+    name: "华尔街见闻"
+    enabled: true
+
+  - id: "wallstreetcn-hot"
+    name: "华尔街见闻"
+    enabled: true
+
+  - id: "wallstreetcn-quick"
+    name: "华尔街见闻"
+    enabled: true
+
+  - id: "thepaper"
+    name: "澎湃新闻"
+    enabled: true
+
+  - id: "cls-telegraph"
+    name: "财联社-电报"
+    enabled: true
+
+  - id: "cls-hot"
+    name: "财联社-热门"
+    enabled: true
+
+  - id: "cls-depth"
+    name: "财联社-深度"
+    enabled: true
+    
+  - id: "v2ex-share"
+    name: "v2ex"
+    enabled: true
+
+  - id: "ifeng"
+    name: "凤凰网"
+    enabled: true
+    
+  - id: "36kr-quick"
+    name: "36氪-快讯"
+    enabled: true
+
+  - id: "36kr-renqi"
+    name: "36氪-热榜"
+    enabled: true
+
+  - id: "mktnews-flash"
+    name: "MK新闻"
+    enabled: true
+    
+  - id: "ithome"
+    name: "it之家"
+    enabled: true
+
+  - id: "sputniknewscn"
+    name: "卫星通讯社"
+    enabled: true
+    
+  - id: "cankaoxiaoxi"
+    name: "参考消息"
+    enabled: true
+    
+  - id: "solidot"
+    name: "Solidot"
+    enabled: true
+
+  - id: "kaopu"
+    name: "靠谱新闻"
+    enabled: true
+    
+
+
