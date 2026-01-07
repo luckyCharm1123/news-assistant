@@ -8,8 +8,9 @@ MCP服务器 - 热点新闻爬虫
 import json
 import logging
 import os
+import socket
 from typing import Any, Dict, List
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import HTTPServer, BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 import requests
 from dotenv import load_dotenv
@@ -29,6 +30,11 @@ logger = logging.getLogger(__name__)
 
 # API基础URL
 API_BASE_URL = "http://localhost:5000"
+
+
+class IPv6HTTPServer(ThreadingHTTPServer):
+    """支持IPv6的HTTP服务器"""
+    address_family = socket.AF_INET6  # 使用IPv6地址族
 
 
 class MCPRequestHandler(BaseHTTPRequestHandler):
@@ -325,11 +331,11 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
 
 
 def run_server(port=3001):
-    """启动MCP服务器"""
-    server_address = ('', port)
-    httpd = HTTPServer(server_address, MCPRequestHandler)
+    """启动MCP服务器（IPv6双栈）"""
+    server_address = ('::', port)  # :: 表示监听所有IPv6地址（同时支持IPv4）
+    httpd = IPv6HTTPServer(server_address, MCPRequestHandler)
 
-    logger.info(f"MCP服务器启动在端口 {port}")
+    logger.info(f"MCP服务器启动在端口 {port} (IPv4 + IPv6)")
     logger.info(f"服务器信息: http://localhost:{port}/mcp")
     logger.info(f"工具列表: http://localhost:{port}/tools")
     logger.info(f"健康检查: http://localhost:{port}/health")

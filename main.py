@@ -88,11 +88,11 @@ def main():
     elif mode == 'web':
         # 仅运行Web服务
         logger.info("模式: 仅Web服务")
-        host = web_config.get('host', '0.0.0.0')
+        host = web_config.get('host', '::')  # IPv6双栈监听
         port = web_config.get('port', 5000)
         debug = web_config.get('debug', False)
 
-        logger.info(f"Web服务启动: http://{host}:{port}")
+        logger.info(f"Web服务启动: http://[::]:{port} (IPv4 + IPv6)")
         app.run(host=host, port=port, debug=debug)
 
     else:
@@ -110,11 +110,11 @@ def main():
         scheduler_thread.start()
 
         # 运行Web服务
-        host = web_config.get('host', '0.0.0.0')
+        host = web_config.get('host', '::')  # IPv6双栈监听
         port = web_config.get('port', 5000)
         debug = web_config.get('debug', False)
 
-        logger.info(f"Web服务启动: http://{host}:{port}")
+        logger.info(f"Web服务启动: http://[::]:{port} (IPv4 + IPv6)")
         logger.info("按 Ctrl+C 停止服务")
 
         try:
