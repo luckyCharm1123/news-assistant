@@ -1,15 +1,17 @@
-# 🔥 热点新闻爬虫
+# 🔥 热点新闻爬虫 + MCP服务
 
-一个自动化的热点新闻聚合与分析工具，支持多平台抓取、数据统计分析和Web查询界面。
+一个自动化的热点新闻聚合与分析工具，支持多平台抓取、数据统计分析、Web查询界面和MCP服务集成。
 
 ## ✨ 功能特性
 
-- **自动爬取**：每5分钟自动抓取各大平台热点新闻
-- **数据去重**：基于URL和标题的智能去重机制
-- **定时清理**：自动清理7天前的过期数据（每天凌晨1点）
-- **Web界面**：提供直观的Web查询界面
+- **自动爬取**：每30分钟自动抓取各大平台热点新闻
+- **智能去重**：基于URL和标题的双重去重机制，带关注度跟踪
+- **定时清理**：自动清理1天前的过期数据（每天凌晨1点）
+- **Web界面**：提供直观的Web查询界面和REST API
 - **统计分析**：热词统计、趋势分析、来源分布等
-- **Docker部署**：支持一键容器化部署
+- **MCP服务**：基于HTTP的MCP服务器，可供n8n等工具调用
+- **API鉴权**：完整的API密钥认证系统，保护敏感操作
+- **Docker部署**：一键启动所有服务（Web + MCP）
 
 ## 📦 支持的新闻平台
 
@@ -24,23 +26,35 @@
 
 ## 🚀 快速开始
 
-### 方式一：Docker部署（推荐）
+### 方式一：Docker一键部署（推荐）⭐
 
 ```bash
-# 克隆项目（或进入项目目录）
-cd hotnews_crawler
+# 1. 克隆项目
+git clone https://github.com/luckyCharm1123/news_MCP.git
+cd news_MCP
 
-# 使用docker-compose启动
-docker-compose up -d
+# 2. 一键部署（启动Web服务 + MCP服务）
+./deploy.sh
+```
+
+**部署完成后可访问**：
+- 📊 Web界面: http://localhost:5000
+- 🔧 MCP服务: http://localhost:3001
+
+**服务管理**：
+```bash
+# 查看状态
+docker-compose ps
 
 # 查看日志
 docker-compose logs -f
 
 # 停止服务
 docker-compose down
-```
 
-启动后访问：`http://localhost:5000`
+# 重启服务
+docker-compose restart
+```
 
 ### 方式二：本地运行
 
@@ -51,9 +65,15 @@ docker-compose down
 pip install -r requirements.txt
 ```
 
-#### 2. 配置文件
+#### 2. 配置环境变量
 
-编辑 `config/config.yaml` 和 `config/platforms.yaml` 根据需要调整配置。
+```bash
+# 复制环境变量模板
+cp .env.example .env
+
+# 编辑.env，设置API_KEY
+nano .env
+```
 
 #### 3. 运行程序
 
@@ -69,12 +89,15 @@ python main.py web
 
 # 单次爬取（测试用）
 python main.py crawl
+
+# 运行MCP服务
+python mcp_server.py
 ```
 
 ## 📁 项目结构
 
 ```
-hotnews_crawler/
+news_MCP/
 ├── config/
 │   ├── config.yaml          # 主配置文件
 │   └── platforms.yaml       # 平台配置

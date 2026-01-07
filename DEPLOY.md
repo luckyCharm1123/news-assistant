@@ -1,12 +1,11 @@
 # 热点新闻爬虫 - 服务器部署指南
 
-## 最快部署方式（3步完成）
+## 最快部署方式（2步完成）
 
 ### 前提条件
 服务器已安装：
 - Docker
 - Docker Compose
-- Python 3.10+
 
 ### 步骤1：上传代码到服务器
 ```bash
@@ -14,24 +13,34 @@
 scp -r hotnews_crawler user@your-server:/path/to/deploy/
 
 # 方式2：使用git克隆（如果代码在git仓库）
-git clone your-repo-url
-cd hotnews_crawler
+git clone https://github.com/luckyCharm1123/news_MCP.git
+cd news_MCP
 ```
 
-### 步骤2：一键部署
+### 步骤2：一键部署（启动所有服务）
 ```bash
-cd /path/to/hotnews_crawler
+cd /path/to/news_MCP
 ./deploy.sh
 ```
 
-### 步骤3：启动MCP服务
-```bash
-./mcp_service.sh start
-```
+**说明**：
+- `deploy.sh` 会自动启动 Web服务（端口5000）和 MCP服务（端口3001）
+- 如果 `.env` 文件不存在，会自动从 `.env.example` 创建
+- 部署完成后，两个服务都会自动运行并支持开机自启动
 
 ---
 
 ## 验证部署
+
+### 检查所有服务
+```bash
+# 检查容器状态
+docker-compose ps
+
+# 应该看到两个容器都在运行：
+# - hotnews_crawler (Web服务)
+# - hotnews_mcp_server (MCP服务)
+```
 
 ### 检查Web服务
 ```bash
@@ -47,40 +56,32 @@ curl http://localhost:3001/health
 
 ## 服务管理命令
 
-### Web服务（Docker）
+### 所有服务（Docker Compose）
 ```bash
 # 查看状态
 docker-compose ps
 
-# 查看日志
+# 查看所有服务日志
 docker-compose logs -f
 
-# 重启服务
+# 查看Web服务日志
+docker-compose logs -f hotnews-crawler
+
+# 查看MCP服务日志
+docker-compose logs -f mcp-server
+
+# 重启所有服务
 docker-compose restart
 
-# 停止服务
+# 重启单个服务
+docker-compose restart hotnews-crawler
+docker-compose restart mcp-server
+
+# 停止所有服务
 docker-compose down
 
 # 重新构建并启动
 docker-compose up -d --build
-```
-
-### MCP服务
-```bash
-# 启动
-./mcp_service.sh start
-
-# 停止
-./mcp_service.sh stop
-
-# 重启
-./mcp_service.sh restart
-
-# 查看状态
-./mcp_service.sh status
-
-# 查看日志
-./mcp_service.sh logs
 ```
 
 ---
@@ -102,36 +103,25 @@ sudo ufw status
 
 ## 设置开机自启动
 
-### Web服务（Docker）
-Docker Compose默认会自动重启容器（已在docker-compose.yml中配置）
+Docker Compose已配置自动重启（`restart: unless-stopped`），服务会在系统重启后自动启动。
 
-### MCP服务（使用systemd）
+无需额外配置systemd服务。
+
+---
+
+## 单独管理MCP服务（可选）
+
+虽然MCP服务已集成到Docker Compose，但如果需要单独运行：
+
 ```bash
-# 创建systemd服务文件
-sudo tee /etc/systemd/system/hotnews-mcp.service > /dev/null <<EOF
-[Unit]
-Description=Hotnews MCP Server
-After=network.target
+# 停止Docker中的MCP服务
+docker-compose stop mcp-server
 
-[Service]
-Type=simple
-User=your-username
-WorkingDirectory=/path/to/hotnews_crawler
-ExecStart=/usr/bin/python3 /path/to/hotnews_crawler/mcp_server.py
-Restart=always
-RestartSec=10
+# 手动运行MCP服务（用于开发调试）
+python3 mcp_server.py
 
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# 启用服务
-sudo systemctl daemon-reload
-sudo systemctl enable hotnews-mcp
-sudo systemctl start hotnews-mcp
-
-# 检查状态
-sudo systemctl status hotnews-mcp
+# 恢复Docker中的MCP服务
+docker-compose start mcp-server
 ```
 
 ---
@@ -145,15 +135,13 @@ sudo netstat -tlnp | grep 5000
 sudo netstat -tlnp | grep 3001
 
 # 修改端口
-# 编辑 config/config.yaml 修改 web.port
-# 编辑 mcp_server.py 修改 run_server(port=3001)
+# 编辑 docker-compose.yml 修改端口映射
 ```
 
 ### 问题2：权限问题
 ```bash
 # 给脚本执行权限
 chmod +x deploy.sh
-chmod +x mcp_service.sh
 
 # 数据目录权限
 chmod -R 755 data logs
@@ -165,17 +153,33 @@ sudo systemctl start docker
 sudo systemctl enable docker
 ```
 
+### 问题4：MCP服务无法连接Web服务
+```bash
+# 检查服务是否都在运行
+docker-compose ps
+
+# 检查网络连接
+docker network inspect hotnews-network
+
+# 查看MCP服务日志
+docker-compose logs mcp-server
+```
+
 ---
 
 ## 监控和维护
 
 ### 定期检查日志
 ```bash
-# Web服务日志
+# 查看所有服务日志
+docker-compose logs -f
+
+# 查看最近100行日志
 docker-compose logs --tail=100
 
-# MCP服务日志
-./mcp_service.sh logs
+# 分别查看服务日志
+docker-compose logs hotnews-crawler
+docker-compose logs mcp-server
 ```
 
 ### 数据库备份（可选）
@@ -184,7 +188,7 @@ docker-compose logs --tail=100
 cp data/hotnews.db data/backup/hotnews_$(date +%Y%m%d_%H%M%S).db
 
 # 定时备份（添加到crontab）
-0 2 * * * cp /path/to/hotnews_crawler/data/hotnews.db /path/to/backup/hotnews_$(date +\%Y\%m\%d).db
+0 2 * * * cp /path/to/news_MCP/data/hotnews.db /path/to/backup/hotnews_$(date +\%Y\%m\%d).db
 ```
 
 ---
@@ -210,4 +214,5 @@ database:
 
 - **Web界面**: http://your-server-ip:5000
 - **MCP服务**: http://your-server-ip:3001
-- **API文档**: 见 MCP_README.md
+- **API文档**: 见 [API_AUTH.md](API_AUTH.md) 和 [MCP_README.md](MCP_README.md)
+

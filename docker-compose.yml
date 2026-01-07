@@ -20,6 +20,34 @@ services:
     networks:
       - hotnews-network
 
+  mcp-server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: hotnews_mcp_server
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      # 挂载环境变量文件（包含API密钥）
+      - ./.env:/app/.env
+    environment:
+      - TZ=Asia/Shanghai
+    # 依赖Web服务先启动
+    depends_on:
+      - hotnews-crawler
+    networks:
+      - hotnews-network
+    # MCP服务启动命令
+    command: ["python", "mcp_server.py"]
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
 networks:
   hotnews-network:
     driver: bridge
