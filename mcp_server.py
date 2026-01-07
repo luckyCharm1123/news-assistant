@@ -156,16 +156,18 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
 
 async def main():
     """启动服务器"""
-    # 使用 SSE 传输
+    # 导入必要的库
     from mcp.server.sse import SseServerTransport
     from starlette.applications import Starlette
     from starlette.routing import Route
+    from starlette.requests import Request
 
-    # 创建 SSE 传输
+    # 1. 创建 SSE 传输实例
+    # 注意：这里的 /messages 是告诉客户端(n8n)往哪里发送指令的地址
     sse_transport = SseServerTransport("/messages")
 
-    # 创建 Starlette 应用
-    async def handle_sse(request):
+    # 2. 定义 SSE 连接处理函数 (GET /sse)
+    async def handle_sse(request: Request):
         async with sse_transport.connect_sse(
             request.scope, request.receive, request._send
         ) as streams:
@@ -180,14 +182,22 @@ async def main():
                 )
             )
 
-    # 创建 Starlette 应用
+    # 3. 定义消息处理函数 (POST /messages)
+    # 必须添加这个，否则 n8n 只能看不能动
+    async def handle_messages(request: Request):
+        await sse_transport.handle_post_message(
+            request.scope, request.receive, request._send
+        )
+
+    # 4. 创建 Starlette 应用，注册两个路由
     app = Starlette(
         routes=[
-            Route("/sse", endpoint=handle_sse)
+            Route("/sse", endpoint=handle_sse),
+            Route("/messages", endpoint=handle_messages, methods=["POST"])
         ]
     )
 
-    # 启动 uvicorn 服务器(监听所有地址,支持 IPv4 + IPv6)
+    # 5. 启动服务器
     config = uvicorn.Config(app, host="::", port=3001, log_level="info")
     server_instance = uvicorn.Server(config)
     await server_instance.serve()
