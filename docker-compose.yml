@@ -6,9 +6,8 @@ services:
     container_name: hotnews_crawler
     restart: unless-stopped
     ports:
-      - "5000:5000"
-      # IPv6支持（如果系统支持IPv6）
-      - ":::5000:5000"
+      - "0.0.0.0:5000:5000"    # 显式绑定 IPv4
+      - "[::]:5000:5000"       # 显式绑定 IPv6
     volumes:
       # 挂载数据目录（持久化数据库和日志）
       - ./data:/app/data
@@ -27,9 +26,8 @@ services:
     container_name: hotnews_mcp_server
     restart: unless-stopped
     ports:
-      - "3001:3001"
-      # IPv6支持（如果系统支持IPv6）
-      - ":::3001:3001"
+      - "0.0.0.0:3001:3001"    # 显式绑定 IPv4
+      - "[::]:3001:3001"       # 显式绑定 IPv6
     volumes:
       # 挂载环境变量文件（包含API密钥）
       - ./.env:/app/.env
