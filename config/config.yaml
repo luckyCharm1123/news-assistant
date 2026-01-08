@@ -21,7 +21,7 @@ scheduler:
 
 # Web配置
 web:
-  host: "0.0.0.0"
+  host: "::"  # IPv6双栈监听 (同时支持IPv4和IPv6)
   port: 5000
   debug: false
 
