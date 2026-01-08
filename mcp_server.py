@@ -76,6 +76,68 @@ async def handle_list_tools() -> list[Tool]:
                     "min_popularity": {"type": "integer", "default": 3, "description": "最小关注度"}
                 }
             }
+        ),
+        Tool(
+            name="add_curated_news",
+            description="添加或更新AI精选新闻（自动去重）",
+            title="添加AI精选新闻",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "description": "AI生成的标题"},
+                    "source_news_id": {"type": "integer", "description": "原始新闻ID"},
+                    "summary": {"type": "string", "description": "新闻摘要（可选）"}
+                },
+                "required": ["title", "source_news_id"]
+            }
+        ),
+        Tool(
+            name="batch_add_curated_news",
+            description="批量添加或更新AI精选新闻（自动去重）",
+            title="批量添加AI精选新闻",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "news_list": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "title": {"type": "string"},
+                                "source_news_id": {"type": "integer"},
+                                "summary": {"type": "string"}
+                            },
+                            "required": ["title", "source_news_id"]
+                        },
+                        "description": "AI精选新闻列表"
+                    }
+                },
+                "required": ["news_list"]
+            }
+        ),
+        Tool(
+            name="get_curated_news",
+            description="获取所有AI精选新闻列表",
+            title="获取AI精选新闻",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "default": 100, "description": "返回数量限制"},
+                    "offset": {"type": "integer", "default": 0, "description": "偏移量"}
+                }
+            }
+        ),
+        Tool(
+            name="check_curated_news_exists",
+            description="检查AI精选新闻标题是否已存在",
+            title="检查精选新闻是否存在",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "description": "标题"}
+                },
+                "required": ["title"]
+            }
         )
     ]
 
@@ -99,6 +161,32 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
         elif name == "get_high_popularity_news":
             params = {"limit": arguments.get("limit", 20), "min_popularity": arguments.get("min_popularity", 3)}
             resp = requests.get(f"{API_BASE_URL}/api/news/high_popularity", params=params, timeout=10)
+            return [TextContent(type="text", text=str(resp.json()))]
+        elif name == "add_curated_news":
+            url = f"{API_BASE_URL}/api/curated_news"
+            payload = {
+                "title": arguments["title"],
+                "source_news_id": arguments["source_news_id"],
+                "summary": arguments.get("summary")
+            }
+            resp = requests.post(url, json=payload, headers=_get_headers(), timeout=10)
+            return [TextContent(type="text", text=str(resp.json()))]
+        elif name == "batch_add_curated_news":
+            url = f"{API_BASE_URL}/api/curated_news/batch"
+            payload = {"news_list": arguments["news_list"]}
+            resp = requests.post(url, json=payload, headers=_get_headers(), timeout=30)
+            return [TextContent(type="text", text=str(resp.json()))]
+        elif name == "get_curated_news":
+            params = {
+                "limit": arguments.get("limit", 100),
+                "offset": arguments.get("offset", 0)
+            }
+            resp = requests.get(f"{API_BASE_URL}/api/curated_news", params=params, timeout=10)
+            return [TextContent(type="text", text=str(resp.json()))]
+        elif name == "check_curated_news_exists":
+            url = f"{API_BASE_URL}/api/curated_news/check"
+            payload = {"title": arguments["title"]}
+            resp = requests.post(url, json=payload, headers=_get_headers(), timeout=10)
             return [TextContent(type="text", text=str(resp.json()))]
         return [TextContent(type="text", text=f"未知工具: {name}")]
     except Exception as e:

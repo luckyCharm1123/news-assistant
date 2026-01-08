@@ -42,6 +42,29 @@ CREATE INDEX IF NOT EXISTS idx_news_source ON news(source);
 
 -- 关注度索引（用于热门排序）
 CREATE INDEX IF NOT EXISTS idx_news_popularity ON news(popularity DESC);
+
+-- AI精选新闻表（用于MCP服务）
+CREATE TABLE IF NOT EXISTS curated_news (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    source_news_id INTEGER NOT NULL,
+    summary TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (source_news_id) REFERENCES news(id) ON DELETE CASCADE
+);
+
+-- 标题去重索引（AI精选新闻）
+CREATE UNIQUE INDEX IF NOT EXISTS idx_curated_news_title
+    ON curated_news(title);
+
+-- 来源新闻ID索引
+CREATE INDEX IF NOT EXISTS idx_curated_news_source_id
+    ON curated_news(source_news_id);
+
+-- 创建时间索引（用于查询）
+CREATE INDEX IF NOT EXISTS idx_curated_news_created_at
+    ON curated_news(created_at DESC);
 """
 
 
@@ -487,3 +510,286 @@ class DatabaseManager:
             """, news_ids)
 
             return [dict(row) for row in cursor.fetchall()]
+
+    # ==================== AI精选新闻相关方法 ====================
+
+    def insert_or_update_curated_news(self, title: str, source_news_id: int, summary: Optional[str] = None) -> int:
+        """
+        插入或更新AI精选新闻（标题去重）
+
+        如果标题已存在，更新summary和source_news_id
+        如果标题不存在，插入新记录
+
+        Args:
+            title: AI生成的标题
+            source_news_id: 原始新闻ID
+            summary: 新闻摘要（可选）
+
+        Returns:
+            记录ID
+        """
+        with self._get_connection() as conn:
+            current_time = datetime.now()
+
+            # 检查标题是否已存在
+            cursor = conn.execute("""
+                SELECT id FROM curated_news WHERE title = ?
+            """, (title,))
+
+            existing = cursor.fetchone()
+
+            if existing:
+                # 更新现有记录
+                conn.execute("""
+                    UPDATE curated_news
+                    SET source_news_id = ?,
+                        summary = ?,
+                        updated_at = ?
+                    WHERE id = ?
+                """, (source_news_id, summary, current_time, existing[0]))
+                self.logger.info(f"更新AI精选新闻: {title}")
+                return existing[0]
+            else:
+                # 插入新记录
+                cursor = conn.execute("""
+                    INSERT INTO curated_news (title, source_news_id, summary, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (title, source_news_id, summary, current_time, current_time))
+                new_id = cursor.lastrowid
+                self.logger.info(f"新增AI精选新闻: {title}, ID={new_id}")
+                return new_id
+
+    def batch_insert_curated_news(self, news_list: List[Dict]) -> Tuple[int, int]:
+        """
+        批量插入AI精选新闻（自动去重）
+
+        Args:
+            news_list: AI精选新闻列表，每项包含 {title, source_news_id, summary}
+
+        Returns:
+            (新增数量, 更新数量)
+        """
+        inserted_count = 0
+        updated_count = 0
+
+        for news in news_list:
+            title = news.get('title', '').strip()
+            source_news_id = news.get('source_news_id')
+            summary = news.get('summary')
+
+            if not title or not source_news_id:
+                self.logger.warning(f"跳过无效数据: title={title}, source_news_id={source_news_id}")
+                continue
+
+            try:
+                # 检查是否已存在
+                with self._get_connection() as conn:
+                    cursor = conn.execute("""
+                        SELECT id FROM curated_news WHERE title = ?
+                    """, (title,))
+
+                    existing = cursor.fetchone()
+                    current_time = datetime.now()
+
+                    if existing:
+                        # 更新
+                        conn.execute("""
+                            UPDATE curated_news
+                            SET source_news_id = ?, summary = ?, updated_at = ?
+                            WHERE id = ?
+                        """, (source_news_id, summary, current_time, existing[0]))
+                        updated_count += 1
+                    else:
+                        # 插入
+                        conn.execute("""
+                            INSERT INTO curated_news (title, source_news_id, summary, created_at, updated_at)
+                            VALUES (?, ?, ?, ?, ?)
+                        """, (title, source_news_id, summary, current_time, current_time))
+                        inserted_count += 1
+
+            except Exception as e:
+                self.logger.error(f"操作失败: {e}, title={title}")
+
+        self.logger.info(f"批量操作完成: 新增={inserted_count}, 更新={updated_count}")
+        return inserted_count, updated_count
+
+    def get_all_curated_news(self, limit: int = 100, offset: int = 0) -> List[Dict]:
+        """
+        获取所有AI精选新闻（带原始新闻信息）
+
+        Args:
+            limit: 返回条数
+            offset: 偏移量
+
+        Returns:
+            AI精选新闻列表（包含原始新闻信息）
+        """
+        with self._get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT
+                    c.id,
+                    c.title,
+                    c.source_news_id,
+                    c.summary,
+                    c.created_at,
+                    c.updated_at,
+                    n.title as original_title,
+                    n.source,
+                    n.url,
+                    n.crawled_at
+                FROM curated_news c
+                LEFT JOIN news n ON c.source_news_id = n.id
+                ORDER BY c.created_at DESC
+                LIMIT ? OFFSET ?
+            """, (limit, offset))
+
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_curated_news_by_id(self, curated_id: int) -> Optional[Dict]:
+        """
+        根据ID获取单条AI精选新闻
+
+        Args:
+            curated_id: AI精选新闻ID
+
+        Returns:
+            AI精选新闻字典，不存在返回None
+        """
+        with self._get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT
+                    c.id,
+                    c.title,
+                    c.source_news_id,
+                    c.summary,
+                    c.created_at,
+                    c.updated_at,
+                    n.title as original_title,
+                    n.source,
+                    n.url,
+                    n.crawled_at
+                FROM curated_news c
+                LEFT JOIN news n ON c.source_news_id = n.id
+                WHERE c.id = ?
+            """, (curated_id,))
+
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def update_curated_news_summary(self, curated_id: int, summary: str) -> bool:
+        """
+        更新AI精选新闻的摘要内容
+
+        Args:
+            curated_id: AI精选新闻ID
+            summary: 摘要内容
+
+        Returns:
+            是否成功更新
+        """
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.execute("""
+                    UPDATE curated_news
+                    SET summary = ?, updated_at = ?
+                    WHERE id = ?
+                """, (summary, datetime.now(), curated_id))
+
+                if cursor.rowcount > 0:
+                    self.logger.info(f"AI精选新闻 ID={curated_id} 摘要已更新")
+                    return True
+                else:
+                    self.logger.warning(f"AI精选新闻 ID={curated_id} 不存在")
+                    return False
+        except Exception as e:
+            self.logger.error(f"更新摘要失败: {e}")
+            return False
+
+    def delete_curated_news(self, curated_id: int) -> bool:
+        """
+        删除AI精选新闻
+
+        Args:
+            curated_id: AI精选新闻ID
+
+        Returns:
+            是否成功删除
+        """
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.execute("DELETE FROM curated_news WHERE id = ?", (curated_id,))
+
+                if cursor.rowcount > 0:
+                    self.logger.info(f"AI精选新闻 ID={curated_id} 已删除")
+                    return True
+                else:
+                    self.logger.warning(f"AI精选新闻 ID={curated_id} 不存在")
+                    return False
+        except Exception as e:
+            self.logger.error(f"删除失败: {e}")
+            return False
+
+    def check_curated_news_exists(self, title: str) -> Optional[Dict]:
+        """
+        检查AI精选新闻标题是否已存在
+
+        Args:
+            title: 标题
+
+        Returns:
+            如果存在返回记录，否则返回None
+        """
+        with self._get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT id, title, summary, source_news_id
+                FROM curated_news
+                WHERE title = ?
+            """, (title,))
+
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_curated_news_with_source_ids(self, curated_ids: List[int]) -> List[Dict]:
+        """
+        根据AI精选新闻ID列表获取记录（包含原始新闻ID）
+
+        用于n8n工作流获取需要生成摘要的新闻
+
+        Args:
+            curated_ids: AI精选新闻ID列表
+
+        Returns:
+            AI精选新闻列表（包含source_news_id）
+        """
+        if not curated_ids:
+            return []
+
+        with self._get_connection() as conn:
+            placeholders = ','.join('?' * len(curated_ids))
+            cursor = conn.execute(f"""
+                SELECT
+                    c.id,
+                    c.title,
+                    c.source_news_id,
+                    c.summary,
+                    n.title as original_title,
+                    n.source,
+                    n.url
+                FROM curated_news c
+                LEFT JOIN news n ON c.source_news_id = n.id
+                WHERE c.id IN ({placeholders})
+                ORDER BY c.created_at DESC
+            """, curated_ids)
+
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_curated_news_count(self) -> int:
+        """
+        获取AI精选新闻总数
+
+        Returns:
+            总数
+        """
+        with self._get_connection() as conn:
+            cursor = conn.execute("SELECT COUNT(*) FROM curated_news")
+            return cursor.fetchone()[0]

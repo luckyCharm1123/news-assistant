@@ -342,4 +342,198 @@ def create_app(config_path: str = "config/config.yaml"):
         """健康检查"""
         return jsonify({'status': 'ok', 'timestamp': datetime.now().isoformat()})
 
+    # ==================== AI精选新闻 API接口 ====================
+
+    @app.route('/api/curated_news', methods=['GET'])
+    def api_curated_news_list():
+        """获取AI精选新闻列表API"""
+        try:
+            limit = int(request.args.get('limit', 100))
+            offset = int(request.args.get('offset', 0))
+
+            curated_list = db.get_all_curated_news(limit=limit, offset=offset)
+            total = db.get_curated_news_count()
+
+            return jsonify({
+                'success': True,
+                'data': curated_list,
+                'total': total,
+                'limit': limit,
+                'offset': offset
+            })
+        except Exception as e:
+            app.logger.error(f"API错误: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/curated_news/<int:curated_id>', methods=['GET'])
+    def api_curated_news_detail(curated_id):
+        """获取单条AI精选新闻详情API"""
+        try:
+            news = db.get_curated_news_by_id(curated_id)
+            if news:
+                return jsonify({'success': True, 'data': news})
+            else:
+                return jsonify({'success': False, 'error': 'AI精选新闻不存在'}), 404
+        except Exception as e:
+            app.logger.error(f"API错误: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/curated_news', methods=['POST'])
+    @require_auth
+    def api_create_curated_news():
+        """创建或更新AI精选新闻API（用于n8n工作流）"""
+        try:
+            data = request.get_json()
+            title = data.get('title', '').strip()
+            source_news_id = data.get('source_news_id')
+            summary = data.get('summary')
+
+            if not title or not source_news_id:
+                return jsonify({
+                    'success': False,
+                    'error': 'title和source_news_id为必填字段'
+                }), 400
+
+            # 检查原始新闻是否存在
+            original_news = db.get_news_by_id(source_news_id)
+            if not original_news:
+                return jsonify({
+                    'success': False,
+                    'error': f'原始新闻ID {source_news_id} 不存在'
+                }), 404
+
+            # 插入或更新
+            curated_id = db.insert_or_update_curated_news(
+                title=title,
+                source_news_id=source_news_id,
+                summary=summary
+            )
+
+            # 获取完整记录
+            curated_news = db.get_curated_news_by_id(curated_id)
+
+            return jsonify({
+                'success': True,
+                'message': f'AI精选新闻已创建/更新',
+                'data': curated_news
+            })
+        except Exception as e:
+            app.logger.error(f"API错误: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/curated_news/batch', methods=['POST'])
+    @require_auth
+    def api_batch_create_curated_news():
+        """批量创建或更新AI精选新闻API（用于n8n工作流）"""
+        try:
+            data = request.get_json()
+            news_list = data.get('news_list', [])
+
+            if not news_list:
+                return jsonify({
+                    'success': False,
+                    'error': 'news_list不能为空'
+                }), 400
+
+            inserted, updated = db.batch_insert_curated_news(news_list)
+
+            return jsonify({
+                'success': True,
+                'message': f'批量操作完成: 新增{inserted}条, 更新{updated}条',
+                'data': {
+                    'inserted_count': inserted,
+                    'updated_count': updated,
+                    'total_count': inserted + updated
+                }
+            })
+        except Exception as e:
+            app.logger.error(f"API错误: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/curated_news/<int:curated_id>/summary', methods=['PUT'])
+    @require_auth
+    def api_update_curated_summary(curated_id):
+        """更新AI精选新闻摘要API（用于n8n工作流）"""
+        try:
+            data = request.get_json()
+            summary = data.get('summary', '').strip()
+
+            if not summary:
+                return jsonify({
+                    'success': False,
+                    'error': 'summary为必填字段'
+                }), 400
+
+            success = db.update_curated_news_summary(curated_id, summary)
+
+            if success:
+                # 获取更新后的记录
+                curated_news = db.get_curated_news_by_id(curated_id)
+                return jsonify({
+                    'success': True,
+                    'message': f'AI精选新闻 ID={curated_id} 摘要已更新',
+                    'data': curated_news
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': f'AI精选新闻 ID={curated_id} 不存在'
+                }), 404
+        except Exception as e:
+            app.logger.error(f"API错误: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/curated_news/<int:curated_id>', methods=['DELETE'])
+    @require_auth
+    def api_delete_curated_news(curated_id):
+        """删除AI精选新闻API"""
+        try:
+            success = db.delete_curated_news(curated_id)
+
+            if success:
+                return jsonify({
+                    'success': True,
+                    'message': f'AI精选新闻 ID={curated_id} 已删除'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': f'AI精选新闻 ID={curated_id} 不存在'
+                }), 404
+        except Exception as e:
+            app.logger.error(f"API错误: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/curated_news/check', methods=['POST'])
+    @require_auth
+    def api_check_curated_news():
+        """检查AI精选新闻标题是否已存在API"""
+        try:
+            data = request.get_json()
+            title = data.get('title', '').strip()
+
+            if not title:
+                return jsonify({
+                    'success': False,
+                    'error': 'title为必填字段'
+                }), 400
+
+            existing = db.check_curated_news_exists(title)
+
+            if existing:
+                return jsonify({
+                    'success': True,
+                    'exists': True,
+                    'data': existing
+                })
+            else:
+                return jsonify({
+                    'success': True,
+                    'exists': False,
+                    'data': None
+                })
+        except Exception as e:
+            app.logger.error(f"API错误: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
     return app
