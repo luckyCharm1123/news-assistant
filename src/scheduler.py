@@ -160,6 +160,7 @@ class NewsScheduler:
 
         try:
             self.scheduler.start()
+            self.logger.info("调度器已启动，等待任务执行...")
         except (KeyboardInterrupt, SystemExit):
             self.logger.info("调度器已停止")
 
