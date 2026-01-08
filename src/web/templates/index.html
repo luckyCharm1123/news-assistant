@@ -37,6 +37,61 @@
     </div>
 </div>
 
+<!-- AI 精选新闻模块 -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2 class="mb-3">🤖 AI 精选新闻</h2>
+        {% if curated_news %}
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">✨ AI 智能总结 ({{ curated_news|length }}条)</h5>
+            </div>
+            <div class="card-body">
+                {% for item in curated_news %}
+                <div class="news-item curated-news-item">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">
+                                <span class="badge bg-success me-2">AI精选</span>
+                                <a href="{{ item.url }}" target="_blank" class="text-decoration-none">{{ item.title }}</a>
+                            </h6>
+                            <div class="mb-1">
+                                {% if item.source %}
+                                <span class="badge bg-secondary me-1">{{ item.source }}</span>
+                                {% endif %}
+                                {% if item.summary %}
+                                <span class="text-muted small">{{ item.summary }}</span>
+                                {% endif %}
+                            </div>
+                            <small class="text-muted">
+                                📅 {{ item.created_at[5:16].replace(' ', ' ') }}
+                                {% if item.updated_at != item.created_at %}
+                                | ✏️ {{ item.updated_at[5:16].replace(' ', ' ') }}
+                                {% endif %}
+                            </small>
+                        </div>
+                        {% if item.url %}
+                        <a href="{{ item.url }}" target="_blank" class="btn btn-sm btn-outline-primary ms-2">
+                            查看原文
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="card">
+            <div class="card-body">
+                <div class="alert alert-info mb-0">
+                    暂无 AI 精选新闻，等待 AI 生成...
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
 <div class="row">
     <div class="col-md-12">
         <h2 class="mb-3">🔥 最新热点（24小时）</h2>

@@ -49,9 +49,13 @@ CREATE TABLE IF NOT EXISTS curated_news (
     title TEXT NOT NULL,
     source_news_id INTEGER NOT NULL,
     summary TEXT,
+    merged_from TEXT,  -- 合并来源的ID列表（JSON数组字符串，如 "[1,2,3]"）
+    is_merged BOOLEAN DEFAULT 0,  -- 是否已被合并（0=否，1=是）
+    merged_into_id INTEGER,  -- 被合并到哪条记录的ID（如果此记录被合并到其他记录）
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (source_news_id) REFERENCES news(id) ON DELETE CASCADE
+    FOREIGN KEY (source_news_id) REFERENCES news(id) ON DELETE CASCADE,
+    FOREIGN KEY (merged_into_id) REFERENCES curated_news(id) ON DELETE SET NULL
 );
 
 -- 标题去重索引（AI精选新闻）
@@ -65,6 +69,14 @@ CREATE INDEX IF NOT EXISTS idx_curated_news_source_id
 -- 创建时间索引（用于查询）
 CREATE INDEX IF NOT EXISTS idx_curated_news_created_at
     ON curated_news(created_at DESC);
+
+-- 合并状态索引
+CREATE INDEX IF NOT EXISTS idx_curated_news_is_merged
+    ON curated_news(is_merged);
+
+-- 被合并记录索引
+CREATE INDEX IF NOT EXISTS idx_curated_news_merged_into
+    ON curated_news(merged_into_id);
 """
 
 
@@ -793,3 +805,142 @@ class DatabaseManager:
         with self._get_connection() as conn:
             cursor = conn.execute("SELECT COUNT(*) FROM curated_news")
             return cursor.fetchone()[0]
+
+    # ==================== 新闻合并相关方法 ====================
+
+    def get_active_curated_news(self, limit: int = 100) -> List[Dict]:
+        """
+        获取所有未被合并的AI精选新闻
+
+        Args:
+            limit: 返回条数
+
+        Returns:
+            未被合并的新闻列表
+        """
+        with self._get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT
+                    c.id,
+                    c.title,
+                    c.summary,
+                    c.source_news_id,
+                    c.created_at,
+                    n.title as original_title,
+                    n.source,
+                    n.url
+                FROM curated_news c
+                LEFT JOIN news n ON c.source_news_id = n.id
+                WHERE c.is_merged = 0
+                ORDER BY c.created_at DESC
+                LIMIT ?
+            """, (limit,))
+
+            return [dict(row) for row in cursor.fetchall()]
+
+    def merge_curated_news(self, keep_id: int, merge_ids: List[int], merged_title: str, merged_summary: str = None) -> bool:
+        """
+        合并AI精选新闻
+
+        注意：此方法会：
+        1. 更新保留记录的标题、摘要和合并来源列表
+        2. 标记被合并的记录为is_merged=1
+        3. 删除news表中对应的原始新闻记录（避免重复）
+
+        Args:
+            keep_id: 保留的主记录ID
+            merge_ids: 要合并进去的记录ID列表
+            merged_title: 合并后的标题
+            merged_summary: 合并后的摘要（可选）
+
+        Returns:
+            是否成功
+        """
+        if not merge_ids:
+            return False
+
+        try:
+            with self._get_connection() as conn:
+                import json
+
+                # 1. 获取主记录的 merged_from
+                cursor = conn.execute("SELECT merged_from FROM curated_news WHERE id = ?", (keep_id,))
+                row = cursor.fetchone()
+                existing_merged = json.loads(row[0]) if row and row[0] else []
+                all_merged_ids = existing_merged + merge_ids
+
+                # 2. 获取要合并记录的source_news_id（用于删除原始新闻）
+                placeholders = ','.join('?' * len(merge_ids))
+                cursor = conn.execute(f"""
+                    SELECT source_news_id
+                    FROM curated_news
+                    WHERE id IN ({placeholders})
+                """, merge_ids)
+                source_news_ids_to_delete = [row[0] for row in cursor.fetchall() if row[0]]
+
+                # 3. 更新主记录
+                conn.execute("""
+                    UPDATE curated_news
+                    SET title = ?,
+                        summary = ?,
+                        merged_from = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (merged_title, merged_summary, json.dumps(all_merged_ids), keep_id))
+
+                # 4. 标记被合并的记录
+                conn.execute(f"""
+                    UPDATE curated_news
+                    SET is_merged = 1,
+                        merged_into_id = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id IN ({placeholders})
+                """, (keep_id, *merge_ids))
+
+                # 5. 删除news表中的原始新闻记录（避免重复）
+                if source_news_ids_to_delete:
+                    delete_placeholders = ','.join('?' * len(source_news_ids_to_delete))
+                    cursor = conn.execute(f"""
+                        DELETE FROM news
+                        WHERE id IN ({delete_placeholders})
+                    """, source_news_ids_to_delete)
+                    deleted_count = cursor.rowcount
+                    self.logger.info(f"合并新闻时删除了 {deleted_count} 条原始新闻记录: {source_news_ids_to_delete}")
+
+                return True
+        except Exception as e:
+            logging.error(f"合并新闻失败: {e}")
+            return False
+
+    def get_curated_news_for_merging(self, news_ids: List[int]) -> List[Dict]:
+        """
+        根据ID列表获取AI精选新闻详情（用于合并判断）
+
+        Args:
+            news_ids: 新闻ID列表
+
+        Returns:
+            新闻详情列表
+        """
+        if not news_ids:
+            return []
+
+        with self._get_connection() as conn:
+            placeholders = ','.join('?' * len(news_ids))
+            cursor = conn.execute(f"""
+                SELECT
+                    c.id,
+                    c.title,
+                    c.summary,
+                    c.source_news_id,
+                    n.title as original_title,
+                    n.source,
+                    n.url,
+                    n.crawled_at
+                FROM curated_news c
+                LEFT JOIN news n ON c.source_news_id = n.id
+                WHERE c.id IN ({placeholders})
+                ORDER BY c.created_at DESC
+            """, news_ids)
+
+            return [dict(row) for row in cursor.fetchall()]

@@ -19,6 +19,10 @@ RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua
 # 复制项目文件
 COPY . .
 
+# 复制启动脚本
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # 创建必要的目录
 RUN mkdir -p data logs
 
@@ -28,6 +32,9 @@ ENV TZ=Asia/Shanghai
 
 # 暴露端口
 EXPOSE 5000 3001
+
+# 使用启动脚本
+ENTRYPOINT ["/entrypoint.sh"]
 
 # 启动命令（默认启动Web服务，可通过docker-compose覆盖）
 CMD ["python", "main.py", "all"]

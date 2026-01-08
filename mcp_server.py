@@ -1,4 +1,5 @@
 import os
+import json
 import requests
 import uvicorn
 import logging
@@ -22,7 +23,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-API_BASE_URL = "http://192.168.1.4:5000"
+API_BASE_URL = "http://[2409:8a28:2580:9e81::7d7]:5000"
 API_KEY = os.getenv('API_KEY', '')
 
 def _get_headers():
@@ -117,12 +118,16 @@ async def handle_list_tools() -> list[Tool]:
         ),
         Tool(
             name="get_curated_news",
-            description="获取所有AI精选新闻列表",
+            description="获取AI精选新闻列表。支持limit='all'获取所有记录",
             title="获取AI精选新闻",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "limit": {"type": "integer", "default": 100, "description": "返回数量限制"},
+                    "limit": {
+                        "type": "string",
+                        "default": "100",
+                        "description": "返回数量限制。'all'或'0'获取所有记录，默认100"
+                    },
                     "offset": {"type": "integer", "default": 0, "description": "偏移量"}
                 }
             }
@@ -137,6 +142,44 @@ async def handle_list_tools() -> list[Tool]:
                     "title": {"type": "string", "description": "标题"}
                 },
                 "required": ["title"]
+            }
+        ),
+        Tool(
+            name="get_active_curated_news",
+            description="获取所有未被合并的AI精选新闻（用于相似新闻合并）",
+            title="获取未合并的AI精选新闻",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "default": 100, "description": "返回数量限制"}
+                }
+            }
+        ),
+        Tool(
+            name="get_curated_news_by_ids",
+            description="根据ID列表获取AI精选新闻详情（用于合并判断）",
+            title="批量获取AI精选新闻详情",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "news_ids": {"type": "array", "items": {"type": "integer"}, "description": "新闻ID列表"}
+                },
+                "required": ["news_ids"]
+            }
+        ),
+        Tool(
+            name="merge_curated_news",
+            description="合并相似的AI精选新闻",
+            title="合并AI精选新闻",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "keep_id": {"type": "integer", "description": "保留的主记录ID"},
+                    "merge_ids": {"type": "array", "items": {"type": "integer"}, "description": "要合并进去的记录ID列表"},
+                    "merged_title": {"type": "string", "description": "合并后的标题"},
+                    "merged_summary": {"type": "string", "description": "合并后的摘要（可选）"}
+                },
+                "required": ["keep_id", "merge_ids", "merged_title"]
             }
         )
     ]
@@ -155,7 +198,15 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
             return [TextContent(type="text", text=str(resp.json()))]
         elif name == "batch_decrease_popularity":
             url = f"{API_BASE_URL}/api/news/batch_decrease_popularity"
-            payload = {"news_ids": arguments["news_ids"], "decrease_amount": arguments.get("decrease_amount", 1)}
+            # 处理 news_ids 参数 - 可能是 JSON 字符串或列表
+            news_ids = arguments["news_ids"]
+            if isinstance(news_ids, str):
+                # 如果是字符串，尝试解析为 JSON
+                try:
+                    news_ids = json.loads(news_ids)
+                except json.JSONDecodeError as e:
+                    return [TextContent(type="text", text=f"Error: news_ids JSON 解析失败: {str(e)}")]
+            payload = {"news_ids": news_ids, "decrease_amount": arguments.get("decrease_amount", 1)}
             resp = requests.post(url, json=payload, headers=_get_headers(), timeout=30)
             return [TextContent(type="text", text=str(resp.json()))]
         elif name == "get_high_popularity_news":
@@ -173,12 +224,91 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
             return [TextContent(type="text", text=str(resp.json()))]
         elif name == "batch_add_curated_news":
             url = f"{API_BASE_URL}/api/curated_news/batch"
-            payload = {"news_list": arguments["news_list"]}
+            # 处理 news_list 参数 - 可能是 JSON 字符串或列表
+            news_list = arguments["news_list"]
+            if isinstance(news_list, str):
+                # 如果是字符串，尝试解析为 JSON
+                try:
+                    news_list = json.loads(news_list)
+                except json.JSONDecodeError as e:
+                    # 尝试修复 JSON 格式问题（未转义的引号）
+                    try:
+                        cleaned = news_list
+                        logger.info(f"原始数据: {cleaned[:200]}")
+
+                        # 使用状态机修复 title 字段中的未转义引号
+                        result = []
+                        i = 0
+                        while i < len(cleaned):
+                            # 查找 "title": " 模式（允许空格变化）
+                            if cleaned[i] == '"' and cleaned[i:i+7].startswith('"title"'):
+                                # 找到 "title"，现在查找 ": "
+                                colon_pos = cleaned.find(':', i)
+                                if colon_pos > 0:
+                                    # 找到冒号，跳过空格找到引号
+                                    quote_pos = colon_pos + 1
+                                    while quote_pos < len(cleaned) and cleaned[quote_pos] == ' ':
+                                        quote_pos += 1
+
+                                    if quote_pos < len(cleaned) and cleaned[quote_pos] == '"':
+                                        # 找到 "title": " 模式
+                                        start_pos = i
+                                        value_start = quote_pos + 1  # title 值开始位置
+                                        result.append(cleaned[start_pos:value_start])  # 添加 "title": "
+                                        i = value_start
+
+                                        # 收集 title 内容，直到找到未转义的 " 后跟 , 或 }
+                                        title_chars = []
+                                        while i < len(cleaned):
+                                            c = cleaned[i]
+
+                                            # 检查是否到达结尾
+                                            if c == '"' and (i + 1 >= len(cleaned) or cleaned[i+1] in ',}'):
+                                                # 找到结尾引号
+                                                title_str = ''.join(title_chars).replace('"', '\\"')
+                                                result.append(title_str)
+                                                result.append('"')
+                                                i += 1
+                                                break
+
+                                            # 否则添加字符
+                                            title_chars.append(c)
+                                            i += 1
+                            else:
+                                result.append(cleaned[i])
+                                i += 1
+
+                        cleaned = ''.join(result)
+                        logger.info(f"清理后数据: {cleaned[:200]}")
+
+                        news_list = json.loads(cleaned)
+                        logger.warning(f"JSON 解析成功，但使用了修复模式（转义了 title 中的引号）")
+                    except Exception as fix_error:
+                        # 提供更详细的错误信息以便调试
+                        error_msg = f"Error: news_list JSON 解析失败: {str(e)}\n"
+                        error_msg += f"收到的数据类型: {type(news_list)}\n"
+                        error_msg += f"数据长度: {len(news_list)} 字符\n"
+                        error_msg += f"数据前500字符: {news_list[:500]}\n\n"
+                        error_msg += f"建议：请检查 n8n 工作流中的 JSON 序列化配置\n"
+                        error_msg += f"确保使用 JSON.stringify() 或等效方法正确序列化数据\n"
+                        error_msg += f"修复尝试也失败: {fix_error}"
+                        logger.error(error_msg)
+                        return [TextContent(type="text", text=error_msg)]
+            payload = {"news_list": news_list}
+            logger.info(f"准备发送批量添加请求，共 {len(news_list)} 条新闻")
             resp = requests.post(url, json=payload, headers=_get_headers(), timeout=30)
             return [TextContent(type="text", text=str(resp.json()))]
+
         elif name == "get_curated_news":
+            # 支持获取所有记录
+            limit_param = arguments.get("limit", "100")
+
+            # 如果 limit 参数为空或为 "all"，传递给 API
+            if limit_param is None or limit_param == "":
+                limit_param = "all"
+
             params = {
-                "limit": arguments.get("limit", 100),
+                "limit": limit_param,
                 "offset": arguments.get("offset", 0)
             }
             resp = requests.get(f"{API_BASE_URL}/api/curated_news", params=params, timeout=10)
@@ -186,6 +316,44 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
         elif name == "check_curated_news_exists":
             url = f"{API_BASE_URL}/api/curated_news/check"
             payload = {"title": arguments["title"]}
+            resp = requests.post(url, json=payload, headers=_get_headers(), timeout=10)
+            return [TextContent(type="text", text=str(resp.json()))]
+        elif name == "get_active_curated_news":
+            # 获取未合并的AI精选新闻（用于合并）
+            limit = arguments.get("limit", 100)
+            params = {"limit": limit, "is_merged": "false"}
+            resp = requests.get(f"{API_BASE_URL}/api/curated_news/active", params=params, headers=_get_headers(), timeout=10)
+            return [TextContent(type="text", text=str(resp.json()))]
+        elif name == "get_curated_news_by_ids":
+            # 批量获取新闻详情
+            # 处理 news_ids 参数 - 可能是 JSON 字符串或列表
+            news_ids = arguments["news_ids"]
+            if isinstance(news_ids, str):
+                # 如果是字符串，尝试解析为 JSON
+                try:
+                    news_ids = json.loads(news_ids)
+                except json.JSONDecodeError as e:
+                    return [TextContent(type="text", text=f"Error: news_ids JSON 解析失败: {str(e)}")]
+            payload = {"news_ids": news_ids}
+            resp = requests.post(f"{API_BASE_URL}/api/curated_news/batch_get", json=payload, headers=_get_headers(), timeout=10)
+            return [TextContent(type="text", text=str(resp.json()))]
+        elif name == "merge_curated_news":
+            # 合并新闻
+            url = f"{API_BASE_URL}/api/curated_news/merge"
+            # 处理 merge_ids 参数 - 可能是 JSON 字符串或列表
+            merge_ids = arguments["merge_ids"]
+            if isinstance(merge_ids, str):
+                # 如果是字符串，尝试解析为 JSON
+                try:
+                    merge_ids = json.loads(merge_ids)
+                except json.JSONDecodeError as e:
+                    return [TextContent(type="text", text=f"Error: merge_ids JSON 解析失败: {str(e)}")]
+            payload = {
+                "keep_id": arguments["keep_id"],
+                "merge_ids": merge_ids,
+                "merged_title": arguments["merged_title"],
+                "merged_summary": arguments.get("merged_summary")
+            }
             resp = requests.post(url, json=payload, headers=_get_headers(), timeout=10)
             return [TextContent(type="text", text=str(resp.json()))]
         return [TextContent(type="text", text=f"未知工具: {name}")]
@@ -378,9 +546,30 @@ async def main():
         Route("/health", endpoint=handle_health)
     ])
 
-    # IPv6双栈监听 (同时支持IPv4和IPv6)
-    config = uvicorn.Config(app, host="::", port=3001, log_level="info")
-    await uvicorn.Server(config).serve()
+    # IPv4/IPv6双栈监听
+    # uvicorn 的 :: 绑定默认不启用 IPv4 映射
+    # 需要创建多个服务器或使用配置来启用双栈
+    # 方法：创建自定义配置来监听所有接口
+    import socket
+    from uvicorn.config import Config
+    from uvicorn.server import Server
+
+    # 创建 socket 并设置 IPV6_V6ONLY=0
+    sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind(('::', 3001))
+
+    config = Config(app, host="::", port=3001, log_level="info")
+    server = Server(config)
+
+    logger.info("启动服务器，监听地址: :::3001 (同时支持 IPv4 和 IPv6)")
+
+    # 使用自定义 socket
+    async def serve():
+        await server.serve(sockets=[sock])
+
+    await serve()
 
 if __name__ == "__main__":
     import asyncio

@@ -5,9 +5,7 @@ services:
       dockerfile: docker/Dockerfile
     container_name: hotnews_crawler
     restart: unless-stopped
-    ports:
-      - "0.0.0.0:5000:5000"    # 显式绑定 IPv4
-      - "[::]:5000:5000"       # 显式绑定 IPv6
+    network_mode: host
     volumes:
       # 挂载数据目录（持久化数据库和日志）
       - ./data:/app/data
@@ -16,8 +14,6 @@ services:
       - ./.env:/app/.env
     environment:
       - TZ=Asia/Shanghai
-    networks:
-      - hotnews-network
 
   mcp-server:
     build:
@@ -25,19 +21,12 @@ services:
       dockerfile: docker/Dockerfile
     container_name: hotnews_mcp_server
     restart: unless-stopped
-    ports:
-      - "0.0.0.0:3001:3001"    # 显式绑定 IPv4
-      - "[::]:3001:3001"       # 显式绑定 IPv6
+    network_mode: host
     volumes:
       # 挂载环境变量文件（包含API密钥）
       - ./.env:/app/.env
     environment:
       - TZ=Asia/Shanghai
-    # 依赖Web服务先启动
-    depends_on:
-      - hotnews-crawler
-    networks:
-      - hotnews-network
     # MCP服务启动命令
     command: ["python", "mcp_server.py"]
     # 健康检查
@@ -47,14 +36,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-
-networks:
-  hotnews-network:
-    driver: bridge
-    # 启用IPv6支持
-    enable_ipv6: true
-    ipam:
-      driver: default
-      config:
-        - subnet: "172.28.0.0/16"
-        - subnet: "fd01:dead:beef:c0::/64"

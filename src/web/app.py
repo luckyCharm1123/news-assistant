@@ -59,15 +59,19 @@ def create_app(config_path: str = "config/config.yaml"):
             # 获取统计信息
             summary = analyzer.get_summary_stats(days=1)
 
+            # 获取AI精选新闻
+            curated_news = db.get_all_curated_news(limit=20, offset=0)
+
             return render_template(
                 'index.html',
                 grouped_news=grouped_news,
                 summary=summary,
+                curated_news=curated_news,
                 current_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             )
         except Exception as e:
             app.logger.error(f"首页加载失败: {e}")
-            return render_template('index.html', grouped_news={}, summary={}, error=str(e))
+            return render_template('index.html', grouped_news={}, summary={}, curated_news=[], error=str(e))
 
     @app.route('/search')
     def search():
@@ -348,7 +352,22 @@ def create_app(config_path: str = "config/config.yaml"):
     def api_curated_news_list():
         """获取AI精选新闻列表API"""
         try:
-            limit = int(request.args.get('limit', 100))
+            # 支持获取所有记录的参数
+            limit_param = request.args.get('limit', '100')
+
+            # 处理特殊的 limit 参数
+            if limit_param == 'all' or limit_param == '0' or limit_param == '':
+                # 获取所有记录，设置一个超大值
+                limit = 999999
+            else:
+                try:
+                    limit = int(limit_param)
+                    # 防止负数
+                    if limit < 0:
+                        limit = 100
+                except (ValueError, TypeError):
+                    limit = 100
+
             offset = int(request.args.get('offset', 0))
 
             curated_list = db.get_all_curated_news(limit=limit, offset=offset)
@@ -358,7 +377,7 @@ def create_app(config_path: str = "config/config.yaml"):
                 'success': True,
                 'data': curated_list,
                 'total': total,
-                'limit': limit,
+                'limit': limit if limit != 999999 else 'all',
                 'offset': offset
             })
         except Exception as e:
@@ -428,6 +447,17 @@ def create_app(config_path: str = "config/config.yaml"):
         try:
             data = request.get_json()
             news_list = data.get('news_list', [])
+
+            # 处理 news_list 参数 - 可能是 JSON 字符串或列表
+            if isinstance(news_list, str):
+                try:
+                    import json
+                    news_list = json.loads(news_list)
+                except json.JSONDecodeError as e:
+                    return jsonify({
+                        'success': False,
+                        'error': f'news_list JSON 解析失败: {str(e)}'
+                    }), 400
 
             if not news_list:
                 return jsonify({
@@ -532,6 +562,92 @@ def create_app(config_path: str = "config/config.yaml"):
                     'exists': False,
                     'data': None
                 })
+        except Exception as e:
+            app.logger.error(f"API错误: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    # ==================== 新闻合并 API接口 ====================
+
+    @app.route('/api/curated_news/active', methods=['GET'])
+    def api_get_active_curated_news():
+        """获取未被合并的AI精选新闻API"""
+        try:
+            limit = int(request.args.get('limit', 100))
+            active_news = db.get_active_curated_news(limit=limit)
+
+            return jsonify({
+                'success': True,
+                'data': active_news,
+                'count': len(active_news)
+            })
+        except Exception as e:
+            app.logger.error(f"API错误: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/curated_news/batch_get', methods=['POST'])
+    def api_batch_get_curated_news():
+        """批量获取AI精选新闻详情API"""
+        try:
+            data = request.get_json()
+            news_ids = data.get('news_ids', [])
+
+            if not news_ids:
+                return jsonify({
+                    'success': False,
+                    'error': 'news_ids 参数不能为空'
+                }), 400
+
+            news_list = db.get_curated_news_for_merging(news_ids)
+
+            return jsonify({
+                'success': True,
+                'data': news_list,
+                'count': len(news_list)
+            })
+        except Exception as e:
+            app.logger.error(f"API错误: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/curated_news/merge', methods=['POST'])
+    @require_auth
+    def api_merge_curated_news():
+        """合并AI精选新闻API"""
+        try:
+            data = request.get_json()
+            keep_id = data.get('keep_id')
+            merge_ids = data.get('merge_ids', [])
+            merged_title = data.get('merged_title', '').strip()
+            merged_summary = data.get('merged_summary')
+
+            if not keep_id or not merge_ids or not merged_title:
+                return jsonify({
+                    'success': False,
+                    'error': 'keep_id, merge_ids, merged_title 为必填字段'
+                }), 400
+
+            # 执行合并
+            success = db.merge_curated_news(
+                keep_id=keep_id,
+                merge_ids=merge_ids,
+                merged_title=merged_title,
+                merged_summary=merged_summary
+            )
+
+            if success:
+                return jsonify({
+                    'success': True,
+                    'message': f'成功合并 {len(merge_ids)} 条新闻到 ID {keep_id}',
+                    'data': {
+                        'keep_id': keep_id,
+                        'merged_count': len(merge_ids),
+                        'merged_ids': merge_ids
+                    }
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': '合并失败'
+                }), 500
         except Exception as e:
             app.logger.error(f"API错误: {e}")
             return jsonify({'success': False, 'error': str(e)}), 500
