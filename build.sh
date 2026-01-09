@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 # 检查 Docker 版本
 echo -e "${YELLOW}检查 Docker 版本...${NC}"
 docker --version
-docker-compose version
+docker compose version
 
 # 确保 BuildKit 已启用
 export DOCKER_BUILDKIT=1
@@ -33,7 +33,7 @@ case "$COMMAND" in
   build)
     echo -e "${YELLOW}开始构建镜像...${NC}"
     echo ""
-    docker-compose build --parallel
+    docker compose build --parallel
     echo ""
     echo -e "${GREEN}✓ 构建完成!${NC}"
     echo ""
@@ -46,7 +46,7 @@ case "$COMMAND" in
   build-no-cache)
     echo -e "${YELLOW}开始构建镜像（无缓存）...${NC}"
     echo ""
-    docker-compose build --no-cache --parallel
+    docker compose build --no-cache --parallel
     echo ""
     echo -e "${GREEN}✓ 构建完成!${NC}"
     ;;
@@ -54,36 +54,36 @@ case "$COMMAND" in
   up)
     echo -e "${YELLOW}构建并启动服务...${NC}"
     echo ""
-    docker-compose up -d --build
+    docker compose up -d --build
     echo ""
     echo -e "${GREEN}✓ 服务已启动!${NC}"
     echo ""
-    echo "查看日志: docker-compose logs -f"
-    echo "查看状态: docker-compose ps"
+    echo "查看日志: docker compose logs -f"
+    echo "查看状态: docker compose ps"
     ;;
 
   down)
     echo -e "${YELLOW}停止并删除容器...${NC}"
-    docker-compose down
+    docker compose down
     echo ""
     echo -e "${GREEN}✓ 容器已停止${NC}"
     ;;
 
   restart)
     echo -e "${YELLOW}重启服务...${NC}"
-    docker-compose restart
+    docker compose restart
     echo ""
     echo -e "${GREEN}✓ 服务已重启${NC}"
     ;;
 
   logs)
     echo -e "${YELLOW}查看日志（Ctrl+C 退出）...${NC}"
-    docker-compose logs -f
+    docker compose logs -f
     ;;
 
   ps)
     echo -e "${YELLOW}容器状态:${NC}"
-    docker-compose ps
+    docker compose ps
     ;;
 
   clean)
@@ -95,7 +95,7 @@ case "$COMMAND" in
 
   rebuild)
     echo -e "${YELLOW}强制重新构建（不使用缓存）...${NC}"
-    docker-compose build --no-cache
+    docker compose build --no-cache
     echo ""
     echo -e "${GREEN}✓ 重新构建完成${NC}"
     ;;
