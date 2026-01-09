@@ -1,8 +1,18 @@
+# Docker Compose 配置文件
+# 使用 BuildKit 构建以获得最佳性能: DOCKER_BUILDKIT=1 docker-compose build
+
 services:
   hotnews-crawler:
     build:
       context: .
       dockerfile: docker/Dockerfile
+      # BuildKit 缓存配置（利用 BuildKit 的缓存挂载功能）
+      cache_from:
+        - hotnews-crawler:latest
+      # 构建参数（可在此处添加自定义构建参数）
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    image: hotnews-crawler:latest
     container_name: hotnews_crawler
     restart: unless-stopped
     network_mode: host
@@ -11,22 +21,30 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
       # 挂载环境变量文件（包含API密钥）
-      - ./.env:/app/.env
+      - ./.env:/app/.env:ro
     environment:
       - TZ=Asia/Shanghai
+      - PYTHONUNBUFFERED=1
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   mcp-server:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
+    # 共享同一个镜像，避免重复构建
+    image: hotnews-crawler:latest
     container_name: hotnews_mcp_server
     restart: unless-stopped
     network_mode: host
     volumes:
       # 挂载环境变量文件（包含API密钥）
-      - ./.env:/app/.env
+      - ./.env:/app/.env:ro
     environment:
       - TZ=Asia/Shanghai
+      - PYTHONUNBUFFERED=1
     # MCP服务启动命令
     command: ["python", "mcp_server.py"]
     # 健康检查
@@ -36,3 +54,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    depends_on:
+      hotnews-crawler:
+        condition: service_healthy

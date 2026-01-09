@@ -129,7 +129,7 @@ class DatabaseManager:
         去重逻辑：
         1. 如果URL存在且不为空，按URL去重
         2. 如果标题存在，按标题去重
-        3. 重复时关注度+1，更新爬取时间
+        3. 重复时关注度+1，但不更新爬取时间（保持首次发现的时间）
 
         Args:
             news_list: 新闻列表，每项包含 {title, source, url, rank}
@@ -168,15 +168,14 @@ class DatabaseManager:
                         existing = cursor.fetchone()
 
                         if existing:
-                            # URL存在，更新关注度+1，更新爬取时间
+                            # URL存在，仅更新关注度+1，不更新爬取时间
                             conn.execute("""
                                 UPDATE news
                                 SET popularity = popularity + 1,
-                                    crawled_at = ?,
                                     source = ?,
                                     rank = ?
                                 WHERE id = ?
-                            """, (current_time, source, rank, existing[0]))
+                            """, (source, rank, existing[0]))
                             updated_count += 1
                         else:
                             # URL不存在，检查标题是否已存在
@@ -187,16 +186,15 @@ class DatabaseManager:
                             existing = cursor.fetchone()
 
                             if existing:
-                                # 标题存在，更新关注度+1，更新爬取时间
+                                # 标题存在，仅更新关注度+1，不更新爬取时间
                                 conn.execute("""
                                     UPDATE news
                                     SET popularity = popularity + 1,
-                                        crawled_at = ?,
                                         source = ?,
                                         rank = ?,
                                         url = ?
                                     WHERE id = ?
-                                """, (current_time, source, rank, url, existing[0]))
+                                """, (source, rank, url, existing[0]))
                                 updated_count += 1
                             else:
                                 # 新数据，插入
@@ -214,15 +212,14 @@ class DatabaseManager:
                         existing = cursor.fetchone()
 
                         if existing:
-                            # 标题存在，更新关注度+1，更新爬取时间
+                            # 标题存在，仅更新关注度+1，不更新爬取时间
                             conn.execute("""
                                 UPDATE news
                                 SET popularity = popularity + 1,
-                                    crawled_at = ?,
                                     source = ?,
                                     rank = ?
                                 WHERE id = ?
-                            """, (current_time, source, rank, existing[0]))
+                            """, (source, rank, existing[0]))
                             updated_count += 1
                         else:
                             # 新数据，插入

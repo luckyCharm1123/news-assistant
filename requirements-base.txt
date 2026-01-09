@@ -1,0 +1,3 @@
+# 基础依赖 - 很少变化
+pyyaml>=6.0
+python-dotenv>=1.0.0

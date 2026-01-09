@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 虚拟环境
+venv/
+env/
+ENV/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 数据库和日志
+data/
+logs/
+*.log
+*.db
+*.db-journal
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 临时文件
+*.tmp
+.cache/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+docker-compose.yml
+docker-compose.override.yml
+# docker/ 目录排除 entrypoint.sh
+docker/*.md
+docker/Dockerfile*
+*.md
+docs/
+LICENSE
+README.md
+
+# 测试
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# 其他
+.env.*
+!.env.example
+tmp/
+temp/
