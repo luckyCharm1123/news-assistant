@@ -41,58 +41,6 @@ async def handle_list_tools() -> list[Tool]:
             inputSchema={"type": "object", "properties": {"hours": {"type": "integer", "default": 2, "description": "获取最近几小时的新闻"}}}
         ),
         Tool(
-            name="decrease_news_popularity",
-            description="降低新闻关注度",
-            title="降低新闻关注度",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "news_id": {"type": "integer", "description": "新闻ID"},
-                    "decrease_amount": {"type": "integer", "default": 1, "description": "降低的数量"}
-                },
-                "required": ["news_id"]
-            }
-        ),
-        Tool(
-            name="batch_decrease_popularity",
-            description="批量降低关注度",
-            title="批量降低关注度",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "news_ids": {"type": "array", "items": {"type": "integer"}, "description": "新闻ID列表"},
-                    "decrease_amount": {"type": "integer", "default": 1, "description": "降低的数量"}
-                },
-                "required": ["news_ids"]
-            }
-        ),
-        Tool(
-            name="get_high_popularity_news",
-            description="获取高关注度新闻",
-            title="获取高关注度新闻",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "limit": {"type": "integer", "default": 20, "description": "返回数量限制"},
-                    "min_popularity": {"type": "integer", "default": 3, "description": "最小关注度"}
-                }
-            }
-        ),
-        Tool(
-            name="add_curated_news",
-            description="添加或更新AI精选新闻（自动去重）",
-            title="添加AI精选新闻",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "title": {"type": "string", "description": "AI生成的标题"},
-                    "source_news_id": {"type": "integer", "description": "原始新闻ID"},
-                    "summary": {"type": "string", "description": "新闻摘要（可选）"}
-                },
-                "required": ["title", "source_news_id"]
-            }
-        ),
-        Tool(
             name="batch_add_curated_news",
             description="批量添加或更新AI精选新闻（自动去重）",
             title="批量添加AI精选新闻",
@@ -115,72 +63,6 @@ async def handle_list_tools() -> list[Tool]:
                 },
                 "required": ["news_list"]
             }
-        ),
-        Tool(
-            name="get_curated_news",
-            description="获取AI精选新闻列表。支持limit='all'获取所有记录",
-            title="获取AI精选新闻",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "limit": {
-                        "type": "string",
-                        "default": "100",
-                        "description": "返回数量限制。'all'或'0'获取所有记录，默认100"
-                    },
-                    "offset": {"type": "integer", "default": 0, "description": "偏移量"}
-                }
-            }
-        ),
-        Tool(
-            name="check_curated_news_exists",
-            description="检查AI精选新闻标题是否已存在",
-            title="检查精选新闻是否存在",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "title": {"type": "string", "description": "标题"}
-                },
-                "required": ["title"]
-            }
-        ),
-        Tool(
-            name="get_active_curated_news",
-            description="获取所有未被合并的AI精选新闻（用于相似新闻合并）",
-            title="获取未合并的AI精选新闻",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "limit": {"type": "integer", "default": 100, "description": "返回数量限制"}
-                }
-            }
-        ),
-        Tool(
-            name="get_curated_news_by_ids",
-            description="根据ID列表获取AI精选新闻详情（用于合并判断）",
-            title="批量获取AI精选新闻详情",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "news_ids": {"type": "array", "items": {"type": "integer"}, "description": "新闻ID列表"}
-                },
-                "required": ["news_ids"]
-            }
-        ),
-        Tool(
-            name="merge_curated_news",
-            description="合并相似的AI精选新闻",
-            title="合并AI精选新闻",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "keep_id": {"type": "integer", "description": "保留的主记录ID"},
-                    "merge_ids": {"type": "array", "items": {"type": "integer"}, "description": "要合并进去的记录ID列表"},
-                    "merged_title": {"type": "string", "description": "合并后的标题"},
-                    "merged_summary": {"type": "string", "description": "合并后的摘要（可选）"}
-                },
-                "required": ["keep_id", "merge_ids", "merged_title"]
-            }
         )
     ]
 
@@ -191,37 +73,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
             hours = arguments.get("hours", 2)
             resp = requests.get(f"{API_BASE_URL}/api/recent_news", params={"hours": hours}, timeout=10)
             return [TextContent(type="text", text=str(resp.json()))]
-        elif name == "decrease_news_popularity":
-            url = f"{API_BASE_URL}/api/news/{arguments['news_id']}/decrease_popularity"
-            payload = {"decrease_amount": arguments.get("decrease_amount", 1)}
-            resp = requests.post(url, json=payload, headers=_get_headers(), timeout=10)
-            return [TextContent(type="text", text=str(resp.json()))]
-        elif name == "batch_decrease_popularity":
-            url = f"{API_BASE_URL}/api/news/batch_decrease_popularity"
-            # 处理 news_ids 参数 - 可能是 JSON 字符串或列表
-            news_ids = arguments["news_ids"]
-            if isinstance(news_ids, str):
-                # 如果是字符串，尝试解析为 JSON
-                try:
-                    news_ids = json.loads(news_ids)
-                except json.JSONDecodeError as e:
-                    return [TextContent(type="text", text=f"Error: news_ids JSON 解析失败: {str(e)}")]
-            payload = {"news_ids": news_ids, "decrease_amount": arguments.get("decrease_amount", 1)}
-            resp = requests.post(url, json=payload, headers=_get_headers(), timeout=30)
-            return [TextContent(type="text", text=str(resp.json()))]
-        elif name == "get_high_popularity_news":
-            params = {"limit": arguments.get("limit", 20), "min_popularity": arguments.get("min_popularity", 3)}
-            resp = requests.get(f"{API_BASE_URL}/api/news/high_popularity", params=params, timeout=10)
-            return [TextContent(type="text", text=str(resp.json()))]
-        elif name == "add_curated_news":
-            url = f"{API_BASE_URL}/api/curated_news"
-            payload = {
-                "title": arguments["title"],
-                "source_news_id": arguments["source_news_id"],
-                "summary": arguments.get("summary")
-            }
-            resp = requests.post(url, json=payload, headers=_get_headers(), timeout=10)
-            return [TextContent(type="text", text=str(resp.json()))]
+
         elif name == "batch_add_curated_news":
             url = f"{API_BASE_URL}/api/curated_news/batch"
             # 处理 news_list 参数 - 可能是 JSON 字符串或列表
@@ -299,63 +151,6 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
             resp = requests.post(url, json=payload, headers=_get_headers(), timeout=30)
             return [TextContent(type="text", text=str(resp.json()))]
 
-        elif name == "get_curated_news":
-            # 支持获取所有记录
-            limit_param = arguments.get("limit", "100")
-
-            # 如果 limit 参数为空或为 "all"，传递给 API
-            if limit_param is None or limit_param == "":
-                limit_param = "all"
-
-            params = {
-                "limit": limit_param,
-                "offset": arguments.get("offset", 0)
-            }
-            resp = requests.get(f"{API_BASE_URL}/api/curated_news", params=params, timeout=10)
-            return [TextContent(type="text", text=str(resp.json()))]
-        elif name == "check_curated_news_exists":
-            url = f"{API_BASE_URL}/api/curated_news/check"
-            payload = {"title": arguments["title"]}
-            resp = requests.post(url, json=payload, headers=_get_headers(), timeout=10)
-            return [TextContent(type="text", text=str(resp.json()))]
-        elif name == "get_active_curated_news":
-            # 获取未合并的AI精选新闻（用于合并）
-            limit = arguments.get("limit", 100)
-            params = {"limit": limit, "is_merged": "false"}
-            resp = requests.get(f"{API_BASE_URL}/api/curated_news/active", params=params, headers=_get_headers(), timeout=10)
-            return [TextContent(type="text", text=str(resp.json()))]
-        elif name == "get_curated_news_by_ids":
-            # 批量获取新闻详情
-            # 处理 news_ids 参数 - 可能是 JSON 字符串或列表
-            news_ids = arguments["news_ids"]
-            if isinstance(news_ids, str):
-                # 如果是字符串，尝试解析为 JSON
-                try:
-                    news_ids = json.loads(news_ids)
-                except json.JSONDecodeError as e:
-                    return [TextContent(type="text", text=f"Error: news_ids JSON 解析失败: {str(e)}")]
-            payload = {"news_ids": news_ids}
-            resp = requests.post(f"{API_BASE_URL}/api/curated_news/batch_get", json=payload, headers=_get_headers(), timeout=10)
-            return [TextContent(type="text", text=str(resp.json()))]
-        elif name == "merge_curated_news":
-            # 合并新闻
-            url = f"{API_BASE_URL}/api/curated_news/merge"
-            # 处理 merge_ids 参数 - 可能是 JSON 字符串或列表
-            merge_ids = arguments["merge_ids"]
-            if isinstance(merge_ids, str):
-                # 如果是字符串，尝试解析为 JSON
-                try:
-                    merge_ids = json.loads(merge_ids)
-                except json.JSONDecodeError as e:
-                    return [TextContent(type="text", text=f"Error: merge_ids JSON 解析失败: {str(e)}")]
-            payload = {
-                "keep_id": arguments["keep_id"],
-                "merge_ids": merge_ids,
-                "merged_title": arguments["merged_title"],
-                "merged_summary": arguments.get("merged_summary")
-            }
-            resp = requests.post(url, json=payload, headers=_get_headers(), timeout=10)
-            return [TextContent(type="text", text=str(resp.json()))]
         return [TextContent(type="text", text=f"未知工具: {name}")]
     except Exception as e:
         return [TextContent(type="text", text=f"Error: {str(e)}")]
