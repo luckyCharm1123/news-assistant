@@ -397,6 +397,20 @@ def create_app(config_path: str = "config/config.yaml"):
             app.logger.error(f"API错误: {e}")
             return jsonify({'success': False, 'error': str(e)}), 500
 
+    @app.route('/api/curated_news/without_summary', methods=['GET'])
+    def api_curated_news_without_summary():
+        """获取所有没有摘要的AI精选新闻API"""
+        try:
+            curated_list = db.get_curated_news_without_summary()
+            return jsonify({
+                'success': True,
+                'data': curated_list,
+                'total': len(curated_list)
+            })
+        except Exception as e:
+            app.logger.error(f"API错误: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
     @app.route('/api/curated_news', methods=['POST'])
     @require_auth
     def api_create_curated_news():

@@ -654,6 +654,34 @@ class DatabaseManager:
 
             return [dict(row) for row in cursor.fetchall()]
 
+    def get_curated_news_without_summary(self) -> List[Dict]:
+        """
+        获取所有没有摘要的AI精选新闻
+
+        Returns:
+            没有摘要的AI精选新闻列表（包含原始新闻信息）
+        """
+        with self._get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT
+                    c.id,
+                    c.title,
+                    c.source_news_id,
+                    c.summary,
+                    c.created_at,
+                    c.updated_at,
+                    n.title as original_title,
+                    n.source,
+                    n.url,
+                    n.crawled_at
+                FROM curated_news c
+                LEFT JOIN news n ON c.source_news_id = n.id
+                WHERE c.summary IS NULL OR c.summary = ''
+                ORDER BY c.created_at DESC
+            """)
+
+            return [dict(row) for row in cursor.fetchall()]
+
     def get_curated_news_by_id(self, curated_id: int) -> Optional[Dict]:
         """
         根据ID获取单条AI精选新闻
