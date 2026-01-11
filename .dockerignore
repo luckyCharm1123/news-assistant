@@ -53,7 +53,6 @@ logs/
 .gitattributes
 
 # Docker
-docker-compose.yml
 docker-compose.override.yml
 # docker/ 目录排除 entrypoint.sh
 docker/*.md
@@ -61,7 +60,6 @@ docker/Dockerfile*
 *.md
 docs/
 LICENSE
-README.md
 
 # 测试
 .pytest_cache/

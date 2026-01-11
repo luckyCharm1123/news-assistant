@@ -32,28 +32,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-
-  mcp-server:
-    # 共享同一个镜像，避免重复构建
-    image: hotnews-crawler:latest
-    container_name: hotnews_mcp_server
-    restart: unless-stopped
-    network_mode: host
-    volumes:
-      # 挂载环境变量文件（包含API密钥）
-      - ./.env:/app/.env:ro
-    environment:
-      - TZ=Asia/Shanghai
-      - PYTHONUNBUFFERED=1
-    # MCP服务启动命令
-    command: ["python", "mcp_server.py"]
-    # 健康检查
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    depends_on:
-      hotnews-crawler:
-        condition: service_healthy

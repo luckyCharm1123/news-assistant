@@ -35,8 +35,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install -r requirements-web.txt \
                    -r requirements-crawler.txt \
-                   -r requirements-ai.txt \
-                   -r requirements-mcp.txt \
                    -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 
@@ -68,13 +66,13 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 COPY config/ ./config/
 COPY docker/entrypoint.sh /entrypoint.sh
 COPY src/ ./src/
-COPY main.py mcp_server.py ./
+COPY main.py ./
 
 # 6. 设置权限并创建目录
 RUN chmod +x /entrypoint.sh && mkdir -p data logs
 
 # 暴露端口
-EXPOSE 5000 3001
+EXPOSE 5000
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
