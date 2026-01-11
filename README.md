@@ -1,9 +1,9 @@
 # 🔥 新闻收集小助手
 
-一个自动化的热点新闻聚合，支持多平台抓取、智能去重。
-PS：本项目仅供学习参考，请勿用于非法用途。
-PS：写这个项目主要是学习n8n时，想做一个新闻的MCP服务，后面改学习skill了，就把MCP去掉了，只保留了数据库部分和对应的API接口。
-PS：对应的skill还在制作优化，后续也会开源。
+**一个自动化的热点新闻聚合，支持多平台抓取、智能去重。**
+- PS：本项目仅供学习参考，请勿用于非法用途。
+- PS：写这个项目主要是学习n8n时，想做一个新闻的MCP服务，后面改学习skill了，就把MCP去掉了，只保留了数据库部分和对应的API接口。
+- PS：对应的skill还在制作优化，后续也会开源。
 
 ## 🙏 致谢
 
@@ -19,8 +19,7 @@ PS：对应的skill还在制作优化，后续也会开源。
 - **自动爬取**：每30分钟自动抓取各大平台热点新闻
 - **智能去重**：基于URL和标题的双重去重机制
 - **定时清理**：自动清理1天前的过期数据（每天凌晨1点）
-- **Web界面**：提供直观的Web查询界面和REST API
-- **统计分析**：热词统计、趋势分析、来源分布等
+- **Web界面**：提供REST API
 - **Docker部署**：支持 Docker Compose 一键部署
 - **IPv6支持**：原生支持 IPv4 和 IPv6 双栈监听
 - **健康检查**：内置容器健康检查机制
@@ -41,7 +40,7 @@ PS：对应的skill还在制作优化，后续也会开源。
 - MK新闻
 
 > 可通过 `config/platforms.yaml` 轻松添加更多平台
-
+> 配置参考新闻源[pinyin.json](https://github.com/ourongxing/newsnow/blob/main/shared/pinyin.json)
 ## 🚀 快速开始
 
 ### 方式一：Docker 部署（推荐）⭐
@@ -207,13 +206,6 @@ platforms:
 
 ## 🎯 使用指南
 
-### Web 界面
-
-访问 `http://localhost:5000` 或 `http://[::1]:5000`：
-
-- **首页**：查看最近24小时的热点新闻
-- **搜索**：按关键词、来源、时间范围搜索新闻
-- **统计**：查看热词排行、趋势分析、来源分布等
 
 ### API 接口
 
@@ -224,38 +216,8 @@ GET /api/news?limit=50&source=华尔街见闻&keyword=xxx
 # 获取新闻详情
 GET /api/news/{id}
 
-# 获取热词统计
-GET /api/stats/hotwords?days=1&top_n=50
-
-# 获取趋势数据
-GET /api/stats/trend?days=7
-
-# 按来源统计
-GET /api/stats/by_source?days=7
-
-# 汇总统计
-GET /api/stats/summary?days=7
-
-# 每小时分布
-GET /api/stats/hourly?days=1
-
-# 热门新闻
-GET /api/top_news?limit=20&source=xxx
 ```
 
-## 📊 数据库结构
-
-### news 表
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | INTEGER | 主键 |
-| title | TEXT | 新闻标题 |
-| source | TEXT | 来源平台 |
-| url | TEXT | 新闻链接（用于去重） |
-| rank | INTEGER | 排名 |
-| crawled_at | TIMESTAMP | 爬取时间 |
-| created_at | TIMESTAMP | 创建时间 |
 
 ### 去重机制
 
@@ -296,7 +258,6 @@ database:
 ## 🛠️ 技术栈
 
 - **Python 3.11+**
-- **Flask** - Web 框架
 - **SQLite** - 数据库
 - **APScheduler** - 定时任务调度
 - **PyYAML** - 配置文件解析
