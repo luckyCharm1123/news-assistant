@@ -40,7 +40,6 @@
 - MK新闻
 
 > 💡 可通过 `config/platforms.yaml` 轻松添加更多平台
->
 > 配置参考新闻源：[pinyin.json](https://github.com/ourongxing/newsnow/blob/main/shared/pinyin.json)
 ## 🚀 快速开始
 
@@ -211,12 +210,32 @@ platforms:
 ### API 接口
 
 ```bash
-# 获取新闻列表
+# 获取最近2小时的新闻（推荐）
+GET /api/recent_news?hours=2
+
+# 获取新闻列表（支持更多过滤条件）
 GET /api/news?limit=50&source=华尔街见闻&keyword=xxx
 
 # 获取新闻详情
 GET /api/news/{id}
+```
 
+**常用示例**：
+```bash
+# 获取最近1小时的新闻
+curl "http://localhost:5000/api/recent_news?hours=1"
+
+# 获取最近2小时的新闻
+curl "http://localhost:5000/api/recent_news?hours=2"
+
+# 获取最近6小时的新闻
+curl "http://localhost:5000/api/recent_news?hours=6"
+
+# 按来源过滤新闻
+curl "http://localhost:5000/api/news?source=华尔街见闻&limit=20"
+
+# 按关键词搜索新闻
+curl "http://localhost:5000/api/news?keyword=AI&limit=10"
 ```
 
 
