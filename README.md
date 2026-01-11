@@ -1,7 +1,19 @@
-# 🔥 热点新闻爬虫
+# 🔥 新闻收集小助手
 
-一个自动化的热点新闻聚合与分析工具，支持多平台抓取、智能去重、数据统计分析和Web查询界面。
+一个自动化的热点新闻聚合，支持多平台抓取、智能去重。
+PS：本项目仅供学习参考，请勿用于非法用途。
+PS：写这个项目主要是学习n8n时，想做一个新闻的MCP服务，后面改学习skill了，就把MCP去掉了，只保留了数据库部分和对应的API接口。
+PS：对应的skill还在制作优化，后续也会开源。
 
+## 🙏 致谢
+
+### 数据来源：NewsNow API
+- 爬取间隔为30分钟
+- 可以关注一下大佬的[newsnow](https://github.com/ourongxing/newsnow)
+- 再次感谢大佬的贡献者，感谢他们提供的数据源。
+### 参考项目：TrendRadar
+- 项目参考[TrendRadar](https://github.com/sansan0/TrendRadar)
+- 感谢大佬的开源
 ## ✨ 功能特性
 
 - **自动爬取**：每30分钟自动抓取各大平台热点新闻
@@ -342,10 +354,6 @@ curl http://localhost:5000/health
 
 GNU General Public License v3.0
 
-## 🙏 致谢
-
-- 数据来源：NewsNow API
-- 参考项目：TrendRadar
 
 ---
 
