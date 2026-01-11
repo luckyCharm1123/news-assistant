@@ -1,85 +1,105 @@
-# 🔥 热点新闻爬虫 + MCP服务
+# 🔥 热点新闻爬虫
 
-一个自动化的热点新闻聚合与分析工具，支持多平台抓取、数据统计分析、Web查询界面和MCP服务集成。
+一个自动化的热点新闻聚合与分析工具，支持多平台抓取、智能去重、数据统计分析和Web查询界面。
 
 ## ✨ 功能特性
 
 - **自动爬取**：每30分钟自动抓取各大平台热点新闻
-- **智能去重**：基于URL和标题的双重去重机制，带关注度跟踪
+- **智能去重**：基于URL和标题的双重去重机制
 - **定时清理**：自动清理1天前的过期数据（每天凌晨1点）
 - **Web界面**：提供直观的Web查询界面和REST API
 - **统计分析**：热词统计、趋势分析、来源分布等
-- **MCP服务**：基于HTTP的MCP服务器，可供n8n等工具调用
-- **API鉴权**：完整的API密钥认证系统，保护敏感操作
-- **Docker部署**：一键启动所有服务（Web + MCP）
+- **Docker部署**：支持 Docker Compose 一键部署
+- **IPv6支持**：原生支持 IPv4 和 IPv6 双栈监听
+- **健康检查**：内置容器健康检查机制
 
 ## 📦 支持的新闻平台
 
-- 今日头条
-- 百度热搜
-- 微博热搜
-- 知乎热榜
-- 抖音热点
-- B站热搜
-- 华尔街见闻
-- 更多平台可配置...
+- 华尔街见闻（新闻/热点/快讯）
+- 澎湃新闻
+- 财联社（电报/热门/深度）
+- 36氪（快讯/热榜）
+- IT之家
+- V2EX 分享
+- 凤凰网
+- 卫星通讯社
+- 参考消息
+- Solidot
+- 靠谱新闻
+- MK新闻
+
+> 可通过 `config/platforms.yaml` 轻松添加更多平台
 
 ## 🚀 快速开始
 
-### 方式一：Docker一键部署（推荐）⭐
+### 方式一：Docker 部署（推荐）⭐
 
 ```bash
 # 1. 克隆项目
 git clone https://github.com/luckyCharm1123/news_MCP.git
 cd news_MCP
 
-# 2. 一键部署（启动Web服务 + MCP服务）
-./deploy.sh
+# 2. 配置环境变量（可选）
+cp .env.example .env
+# 编辑 .env 文件设置必要的环境变量
+
+# 3. 启动服务
+docker compose up -d
+
+# 或者使用传统命令（需启用 BuildKit）
+DOCKER_BUILDKIT=1 docker-compose build
+docker-compose up -d
 ```
 
 **部署完成后可访问**：
 - 📊 Web界面: http://localhost:5000
-- 🔧 MCP服务: http://localhost:3001
+- 📊 健康检查: http://localhost:5000/health
 
 **服务管理**：
 ```bash
 # 查看状态
-docker-compose ps
+docker compose ps
 
 # 查看日志
-docker-compose logs -f
+docker compose logs -f
 
 # 停止服务
-docker-compose down
+docker compose down
 
 # 重启服务
-docker-compose restart
+docker compose restart
+
+# 重新构建并启动
+docker compose up -d --build
 ```
 
 ### 方式二：本地运行
 
-#### 1. 安装依赖
+#### 1. 环境要求
+
+- Python 3.11+
+
+#### 2. 安装依赖
 
 ```bash
-# Python 3.11+
 pip install -r requirements.txt
 ```
 
-#### 2. 配置环境变量
+#### 3. 配置环境变量（可选）
 
 ```bash
 # 复制环境变量模板
 cp .env.example .env
 
-# 编辑.env，设置API_KEY
+# 根据需要编辑 .env 文件
 nano .env
 ```
 
-#### 3. 运行程序
+#### 4. 运行程序
 
 ```bash
-# 同时运行调度器和Web服务
-python main.py all
+# 同时运行调度器和Web服务（推荐）
+python main.py
 
 # 仅运行调度器
 python main.py scheduler
@@ -89,35 +109,31 @@ python main.py web
 
 # 单次爬取（测试用）
 python main.py crawl
-
-# 运行MCP服务
-python mcp_server.py
 ```
 
 ## 📁 项目结构
 
 ```
-news_MCP/
+hotnews_crawler/
 ├── config/
 │   ├── config.yaml          # 主配置文件
 │   └── platforms.yaml       # 平台配置
-├── src/
-│   ├── __init__.py
-│   ├── crawler.py           # 爬虫模块
-│   ├── database.py          # 数据库模块
-│   ├── scheduler.py         # 调度器模块
-│   ├── analyzer.py          # 统计分析模块
-│   └── web/
-│       ├── app.py           # Flask应用
-│       └── templates/       # HTML模板
-├── data/
-│   └── hotnews.db           # SQLite数据库
-├── logs/                    # 日志目录
-├── main.py                  # 主程序入口
 ├── docker/
-│   ├── Dockerfile
-│   └── docker-compose.yml
-├── requirements.txt
+│   ├── Dockerfile           # Docker 镜像构建文件
+│   └── entrypoint.sh        # 容器启动脚本
+├── src/
+│   ├── crawler.py           # 爬虫模块
+│   ├── database.py          # 数据库操作模块
+│   ├── scheduler.py         # 定时调度模块
+│   └── web/
+│       └── app.py           # Flask Web 应用
+├── data/
+│   └── hotnews.db           # SQLite 数据库（自动生成）
+├── logs/                    # 日志目录（自动生成）
+├── main.py                  # 主程序入口
+├── docker-compose.yml       # Docker Compose 配置
+├── requirements.txt         # Python 依赖
+├── .env.example             # 环境变量模板
 └── README.md
 ```
 
@@ -129,60 +145,69 @@ news_MCP/
 # 数据库配置
 database:
   path: "data/hotnews.db"      # 数据库路径
-  retention_days: 7            # 数据保留天数
+  retention_days: 1            # 数据保留天数（保留今天，清理昨天的数据）
 
 # 爬虫配置
 crawler:
   api_url: "https://newsnow.busiyi.world/api/s"
   request_interval: 1          # 请求间隔（秒）
   max_retries: 2               # 最大重试次数
+  retry_wait_min: 3            # 最小重试等待时间（秒）
+  retry_wait_max: 5            # 最大重试等待时间（秒）
   timeout: 10                  # 请求超时（秒）
 
 # 调度配置
 scheduler:
-  crawl_interval: 300          # 爬取间隔（秒），5分钟
+  crawl_interval: 1800         # 爬取间隔（秒），30分钟
   cleanup_time: "01:00"        # 每天清理时间
 
 # Web配置
 web:
-  host: "0.0.0.0"
+  host: "::"                   # IPv6双栈监听 (同时支持IPv4和IPv6)
   port: 5000
   debug: false
 
 # 日志配置
 logging:
-  level: "INFO"
+  level: "INFO"                # DEBUG, INFO, WARNING, ERROR
   file: "logs/crawler.log"
+  max_bytes: 10485760          # 10MB
+  backup_count: 5
+
+# 时区配置
+timezone: "Asia/Shanghai"
 ```
 
 ### 平台配置 (config/platforms.yaml)
 
 ```yaml
 platforms:
-  - id: "toutiao"
-    name: "今日头条"
-    enabled: true              # 是否启用
+  - id: "wallstreetcn-news"    # 平台唯一标识（勿修改）
+    name: "华尔街见闻"         # 显示名称（可自定义）
+    enabled: true              # 是否启用该平台
 
-  - id: "baidu"
-    name: "百度热搜"
+  - id: "36kr-quick"
+    name: "36氪-快讯"
     enabled: true
+
+  # 添加更多平台...
 ```
 
 ## 🎯 使用指南
 
-### Web界面
+### Web 界面
 
-访问 `http://localhost:5000`：
+访问 `http://localhost:5000` 或 `http://[::1]:5000`：
 
-1. **首页**：查看最近24小时的热点新闻
-2. **搜索**：按关键词、来源、时间范围搜索新闻
-3. **统计**：查看热词排行、趋势分析、来源分布等
+- **首页**：查看最近24小时的热点新闻
+- **搜索**：按关键词、来源、时间范围搜索新闻
+- **统计**：查看热词排行、趋势分析、来源分布等
 
-### API接口
+### API 接口
 
 ```bash
 # 获取新闻列表
-GET /api/news?limit=50&source=今日头条&keyword=xxx
+GET /api/news?limit=50&source=华尔街见闻&keyword=xxx
 
 # 获取新闻详情
 GET /api/news/{id}
@@ -223,7 +248,7 @@ GET /api/top_news?limit=20&source=xxx
 ### 去重机制
 
 - **主要方式**：基于 `source + url` 的唯一索引
-- **备用方式**：如果URL为空，使用 `source + title` 去重
+- **备用方式**：如果 URL 为空，使用 `source + title` 去重
 
 ## 🔧 开发说明
 
@@ -244,7 +269,7 @@ platforms:
 
 ```yaml
 scheduler:
-  crawl_interval: 300  # 修改为需要的秒数
+  crawl_interval: 1800  # 修改为需要的秒数（默认30分钟）
 ```
 
 ### 调整数据保留期
@@ -253,33 +278,33 @@ scheduler:
 
 ```yaml
 database:
-  retention_days: 7  # 修改为需要的天数
+  retention_days: 1  # 修改为需要的天数（默认保留1天）
 ```
 
 ## 🛠️ 技术栈
 
 - **Python 3.11+**
-- **Flask** - Web框架
+- **Flask** - Web 框架
 - **SQLite** - 数据库
-- **APScheduler** - 定时任务
-- **Jieba** - 中文分词
-- **Bootstrap 5** - 前端框架
-- **ECharts** - 数据可视化
+- **APScheduler** - 定时任务调度
+- **PyYAML** - 配置文件解析
+- **Docker** - 容器化部署
 
 ## 📝 注意事项
 
-1. **时区设置**：默认使用 Asia/Shanghai 时区，可在环境变量中修改
+1. **时区设置**：默认使用 `Asia/Shanghai` 时区
 2. **数据备份**：重要数据请定期备份 `data/hotnews.db`
-3. **日志管理**：日志文件会自动轮转，保留最近5个文件
-4. **API限流**：请合理设置请求间隔，避免对目标网站造成压力
+3. **日志管理**：日志文件会自动轮转，保留最近 5 个文件，每个文件最大 10MB
+4. **IPv6 支持**：默认使用 `::` 监听，同时支持 IPv4 和 IPv6 访问
+5. **数据清理**：默认只保留当天数据，每天凌晨 1 点自动清理过期数据
 
 ## 🐛 常见问题
 
 ### Q: 如何查看日志？
 
 ```bash
-# Docker部署
-docker-compose logs -f
+# Docker 部署
+docker compose logs -f
 
 # 本地运行
 tail -f logs/crawler.log
@@ -287,17 +312,30 @@ tail -f logs/crawler.log
 
 ### Q: 数据库文件太大怎么办？
 
-1. 减少保留天数：修改 `config.yaml` 中的 `retention_days`
+1. 减少保留天数：修改 `config/config.yaml` 中的 `retention_days`
 2. 手动清理：删除 `data/hotnews.db`，程序会自动重建
 
 ### Q: 如何停止服务？
 
 ```bash
-# Docker部署
-docker-compose down
+# Docker 部署
+docker compose down
 
 # 本地运行
 按 Ctrl+C
+```
+
+### Q: 容器健康检查失败怎么办？
+
+```bash
+# 检查容器状态
+docker compose ps
+
+# 查看健康检查日志
+docker compose logs hotnews-crawler | grep health
+
+# 手动测试健康检查端点
+curl http://localhost:5000/health
 ```
 
 ## 📄 许可证
