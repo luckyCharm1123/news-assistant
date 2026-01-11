@@ -39,8 +39,9 @@
 - 靠谱新闻
 - MK新闻
 
-> 可通过 `config/platforms.yaml` 轻松添加更多平台
-> 配置参考新闻源[pinyin.json](https://github.com/ourongxing/newsnow/blob/main/shared/pinyin.json)
+> 💡 可通过 `config/platforms.yaml` 轻松添加更多平台
+>
+> 配置参考新闻源：[pinyin.json](https://github.com/ourongxing/newsnow/blob/main/shared/pinyin.json)
 ## 🚀 快速开始
 
 ### 方式一：Docker 部署（推荐）⭐
